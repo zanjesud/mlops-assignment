@@ -8,4 +8,14 @@ wheels/
 
 # Virtual environments
 .venv
-dvc_google.json
+
+# MLflow and MLRun
+mlflow.db
+mlruns/
+classification_report.json
+performance_summary.json
+confusion_matrix.csv
+feature_importance.csv
+
+# model export file 
+*.pkl
