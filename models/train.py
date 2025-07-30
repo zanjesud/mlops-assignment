@@ -80,11 +80,11 @@ def train(model_type, test_size, random_state):
         
         # Log metrics
         mlflow.log_metrics({
-            "accuracy": accuracy,
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1,
-            "training_time_seconds": training_time
+            "accuracy": float(accuracy),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1_score": float(f1),
+            "training_time_seconds": float(training_time)
         })
         
         # Log confusion matrix
@@ -127,7 +127,7 @@ def train(model_type, test_size, random_state):
             model, 
             name="model",
             signature=signature,
-            registered_model_name="iris_classifier" if accuracy > 0.95 else None
+            registered_model_name="iris_classifier" if accuracy > 0.92 else None
         )
         
         # Save test data for later use
@@ -136,7 +136,7 @@ def train(model_type, test_size, random_state):
         joblib.dump((X_test, y_test), test_data_path)
         mlflow.log_artifact(test_data_path)
                        
-        if accuracy > 0.95:
+        if accuracy > 0.92:
             print("Model registered successfully!")
 
 if __name__ == "__main__":

@@ -19,3 +19,7 @@ feature_importance.csv
 
 # model export file 
 *.pkl
+
+#logs 
+logs/
+SteptoImplements.txt
