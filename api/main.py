@@ -1,17 +1,7 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, conlist, field_validator,Field
 import mlflow.pyfunc
-
-from typing import List
-
-class IrisFeatures(BaseModel):
-    data: List[List[float]] = Field(..., min_items=1)
-
-    @field_validator('data')
-    def check_inner_list_length(cls, v):
-        if not all(len(inner) == 4 for inner in v):
-            raise ValueError('Each inner list must have exactly 4 floats')
-        return v
+import pandas as pd
+from api.schema import IrisFeatures
 
 app = FastAPI(
     title="Iris Classifier API",
@@ -20,8 +10,6 @@ app = FastAPI(
 )
 
 model = mlflow.pyfunc.load_model(model_uri="models:/iris_classifier@production")
-
-import pandas as pd  # Add this import at the top
 
 @app.post("/predict")
 def predict(features: IrisFeatures):
