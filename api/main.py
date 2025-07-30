@@ -4,11 +4,18 @@ import pandas as pd
 from api.schema import IrisFeatures
 import logging, sqlite3, json, datetime as dt
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
+
 app = FastAPI(
     title="Iris Classifier API",
     description="Predict iris species with a Production-stage MLflow model",
     version="1.0.0",
 )
+
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
+# http://127.0.0.1:8000/metrics  enpoints for checking matrix  
 
 model = mlflow.pyfunc.load_model(model_uri="models:/iris_classifier@production")
 
