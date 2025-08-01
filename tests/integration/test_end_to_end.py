@@ -43,7 +43,7 @@ def test_end_to_end_prediction():
     }
     response = requests.post(f"{API_URL}/predict", json=test_data, timeout=5)
     assert response.status_code == 200
-    
+
     # Then check if UI is accessible
     response = requests.get(f"{UI_URL}", timeout=5)
     assert response.status_code == 200
@@ -91,7 +91,7 @@ def test_service_dependencies():
         (f"{API_URL}/health", "API"),
         (f"{UI_URL}/_stcore/health", "UI")
     ]
-    
+
     for url, service_name in services:
         try:
             response = requests.get(url, timeout=5)
@@ -101,4 +101,4 @@ def test_service_dependencies():
 
 if __name__ == "__main__":
     # Run tests
-    pytest.main([__file__, "-v"]) 
+    pytest.main([__file__, "-v"])

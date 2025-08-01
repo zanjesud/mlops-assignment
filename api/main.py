@@ -18,7 +18,7 @@ app = FastAPI(
 )
 
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
-# http://127.0.0.1:8000/metrics  enpoints for checking matrix  
+# http://127.0.0.1:8000/metrics  enpoints for checking matrix
 
 
 logging.basicConfig(
@@ -35,7 +35,10 @@ conn.execute(
 @app.get("/health")
 def health_check():
     """Health check endpoint for monitoring"""
-    return {"status": "healthy", "timestamp": dt.datetime.now(dt.timezone.utc).isoformat()}
+    return {
+        "status": "healthy",
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat()
+    }
 
 @app.get("/")
 def root():
@@ -50,13 +53,18 @@ def root():
 @app.post("/predict")
 def predict(features: IrisFeatures):
     try:
-        # model = mlflow.pyfunc.load_model(model_uri="models:/iris_classifier@production")
+        # model = mlflow.pyfunc.load_model(
+        #     model_uri="models:/iris_classifier@production"
+        # )
         model = mlflow.pyfunc.load_model(model_uri="models/production_model")
     except Exception as e:
         logging.error(f"Error loading model: {e}")
         return {"error": "Model not found"}
-    
-    columns = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
+
+    columns = [
+        'sepal length (cm)', 'sepal width (cm)',
+        'petal length (cm)', 'petal width (cm)'
+    ]
     df = pd.DataFrame(features.data, columns=columns)
     preds = model.predict(df)
     now = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -65,6 +73,9 @@ def predict(features: IrisFeatures):
         (now, json.dumps(features.data), json.dumps(preds.tolist())),
     )
     conn.commit()
-    logging.info(f"Prediction logged for {json.dumps(features.data)} as {json.dumps(preds.tolist())}")
-    
+    logging.info(
+        f"Prediction logged for {json.dumps(features.data)} "
+        f"as {json.dumps(preds.tolist())}"
+    )
+
     return {"predictions": preds.tolist()}

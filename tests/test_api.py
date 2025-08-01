@@ -48,4 +48,4 @@ def test_metrics_endpoint():
 def test_docs_endpoint():
     """Test API documentation endpoint"""
     response = client.get("/docs")
-    assert response.status_code == 200 
+    assert response.status_code == 200
