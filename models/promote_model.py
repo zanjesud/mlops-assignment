@@ -8,8 +8,6 @@ import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 import click
-import pandas as pd
-import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import logging
 import sys
@@ -51,8 +49,6 @@ class ModelPromoter:
             for model in models:
                 if model.name == self.model_name:
                     try:
-                        versions = self.client.search_model_versions(f"name='{model.name}'")
-                        # logger.info(versions)
                         logger.info(f"\nModel: {model.name}")
                         for v in self.client.search_model_versions(f"name='{model.name}'"):
                             logger.info(f"Version: {v.version}, Run ID: {v.run_id}")
@@ -100,7 +96,7 @@ class ModelPromoter:
             recall = recall_score(y_test, y_pred, average='weighted')
             f1 = f1_score(y_test, y_pred, average='weighted')
             
-            logger.info(f"Model Performance Validation:")
+            logger.info("Model Performance Validation:")
             logger.info(f"  Accuracy: {accuracy:.4f}")
             logger.info(f"  Precision: {precision:.4f}")
             logger.info(f"  Recall: {recall:.4f}")
@@ -133,7 +129,7 @@ class ModelPromoter:
             # Register model if not already registered
             try:
                 self.client.get_registered_model(self.model_name)
-            except:
+            except Exception:
                 logger.info(f"Registering new model: {self.model_name}")
                 mlflow.register_model(model_uri, self.model_name)
             
@@ -302,7 +298,7 @@ class ModelPromoter:
                 'f1_score': f1_score(y_test, y_pred2, average='weighted')
             }
             
-            logger.info(f"Model Comparison:")
+            logger.info("Model Comparison:")
             logger.info(f"Version {version1}: {metrics1}")
             logger.info(f"Version {version2}: {metrics2}")
             

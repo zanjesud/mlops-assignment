@@ -7,8 +7,6 @@ Can be used in CI/CD pipelines for automatic model promotion based on performanc
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
-import pandas as pd
-import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import logging
 import sys
@@ -104,7 +102,7 @@ class AutoModelPromoter:
             # Register model if not already registered
             try:
                 self.client.get_registered_model(self.model_name)
-            except:
+            except Exception:
                 logger.info(f"Registering new model: {self.model_name}")
                 mlflow.register_model(model_uri, self.model_name)
             

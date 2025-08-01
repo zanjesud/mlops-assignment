@@ -2,7 +2,10 @@ from fastapi import FastAPI
 import mlflow.pyfunc
 import pandas as pd
 from api.schema import IrisFeatures
-import logging, sqlite3, json, datetime as dt
+import logging
+import sqlite3
+import json
+import datetime as dt
 
 from prometheus_fastapi_instrumentator import Instrumentator
 

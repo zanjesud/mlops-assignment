@@ -11,7 +11,6 @@ import os
 import json
 import click
 import time
-from datetime import datetime
 
 @click.command()
 @click.option("--model_type", type=click.Choice(["logreg", "rf"]), default="logreg", help="Type of model to train")
@@ -70,7 +69,6 @@ def train(model_type, test_size, random_state):
         
         # Make predictions
         y_pred = model.predict(X_test)
-        y_pred_proba = model.predict_proba(X_test)
         
         # Calculate metrics
         accuracy = accuracy_score(y_test, y_pred)

@@ -4,7 +4,6 @@ Model evaluation script for CI/CD pipeline
 """
 
 import mlflow
-import pandas as pd
 import joblib
 import json
 import os

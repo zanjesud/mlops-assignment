@@ -1,6 +1,5 @@
 import pytest
 import requests
-import time
 import os
 
 # Configuration

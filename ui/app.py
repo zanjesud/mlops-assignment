@@ -1,5 +1,6 @@
 # src/ui/app.py
-import streamlit as st, requests, pandas as pd
+import streamlit as st
+import requests
 import os
 
 # Get API URL from environment variable or use default
@@ -38,5 +39,5 @@ if st.sidebar.checkbox("Show API Status"):
             st.sidebar.success("✅ API is healthy")
         else:
             st.sidebar.error("❌ API health check failed")
-    except:
+    except Exception:
         st.sidebar.error("❌ Cannot connect to API")
