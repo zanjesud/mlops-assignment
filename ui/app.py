@@ -1,10 +1,11 @@
 # src/ui/app.py
-import streamlit as st
-import requests
 import os
 
+import requests
+import streamlit as st
+
 # Get API URL from environment variable or use default
-API_URL = os.getenv('API_URL', 'http://localhost:8000')
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.title("🌸 Iris Species Classifier")
 sl = st.slider("Sepal length (cm)", 4.0, 8.0, 5.1)

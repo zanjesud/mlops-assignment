@@ -3,15 +3,25 @@
 Model evaluation script for CI/CD pipeline
 """
 
-import mlflow
-import joblib
 import json
 import os
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+
 import click
+import joblib
+import mlflow
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+
 
 @click.command()
-@click.option("--model_name", default="iris_classifier", help="Name of the model to evaluate")
+@click.option(
+    "--model_name", default="iris_classifier", help="Name of the model to evaluate"
+)
 @click.option("--stage", default="production", help="Model stage to evaluate")
 def evaluate_model(model_name, stage):
     """
@@ -40,9 +50,9 @@ def evaluate_model(model_name, stage):
 
         # Calculate metrics
         accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, average='weighted')
-        recall = recall_score(y_test, y_pred, average='weighted')
-        f1 = f1_score(y_test, y_pred, average='weighted')
+        precision = precision_score(y_test, y_pred, average="weighted")
+        recall = recall_score(y_test, y_pred, average="weighted")
+        f1 = f1_score(y_test, y_pred, average="weighted")
 
         # Generate classification report
         report = classification_report(y_test, y_pred, output_dict=True)
@@ -55,7 +65,7 @@ def evaluate_model(model_name, stage):
             "f1_score": float(f1),
             "model_name": model_name,
             "stage": stage,
-            "test_samples": len(X_test)
+            "test_samples": len(X_test),
         }
 
         # Save detailed report
@@ -78,7 +88,7 @@ def evaluate_model(model_name, stage):
             "accuracy": 0.92,
             "f1_score": 0.90,
             "precision": 0.90,
-            "recall": 0.90
+            "recall": 0.90,
         }
 
         print("\n🎯 Performance Thresholds:")
@@ -87,7 +97,9 @@ def evaluate_model(model_name, stage):
             value = metrics[metric]
             passed = value >= threshold
             status = "✅" if passed else "❌"
-            print(f"{status} {metric.capitalize()}: {value:.4f} (threshold: {threshold:.2f})")
+            print(
+                f"{status} {metric.capitalize()}: {value:.4f} (threshold: {threshold:.2f})"
+            )
             if not passed:
                 all_passed = False
 
@@ -101,6 +113,7 @@ def evaluate_model(model_name, stage):
     except Exception as e:
         print(f"❌ Error during model evaluation: {e}")
         return None
+
 
 if __name__ == "__main__":
     evaluate_model()

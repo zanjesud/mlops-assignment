@@ -4,29 +4,30 @@ Model Promotion Script for MLflow
 Handles model promotion from Staging to Production with validation checks.
 """
 
+import logging
+import os
+import shutil
+import sys
+from datetime import datetime
+
+import click
+import joblib
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
-import click
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-import logging
-import sys
-from datetime import datetime
-import joblib
-import os
-import shutil
-
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler('logs/model_promotion.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+        logging.FileHandler("logs/model_promotion.log"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 logger = logging.getLogger(__name__)
+
 
 class ModelPromoter:
     """Handles model promotion through MLflow stages"""
@@ -43,18 +44,24 @@ class ModelPromoter:
             logger.info(f"Found {len(models)} registered models")
 
             if not models:
-                logger.info("No registered models found. You may need to train and register a model first.")
+                logger.info(
+                    "No registered models found. You may need to train and register a model first."
+                )
                 return True
 
             for model in models:
                 if model.name == self.model_name:
                     try:
                         logger.info(f"\nModel: {model.name}")
-                        for v in self.client.search_model_versions(f"name='{model.name}'"):
+                        for v in self.client.search_model_versions(
+                            f"name='{model.name}'"
+                        ):
                             logger.info(f"Version: {v.version}, Run ID: {v.run_id}")
                             logger.info(f"Aliases: {v.aliases}")
                     except Exception as e:
-                        logger.warning(f"Could not get versions for model {model.name}: {e}")
+                        logger.warning(
+                            f"Could not get versions for model {model.name}: {e}"
+                        )
                 else:
                     logger.info(f"Model: {model.name} (not the target model)")
             return True
@@ -70,7 +77,9 @@ class ModelPromoter:
         """Get model versions for a specific stage"""
         try:
             if stage:
-                versions = self.client.get_latest_versions(self.model_name, stages=[stage])
+                versions = self.client.get_latest_versions(
+                    self.model_name, stages=[stage]
+                )
             else:
                 versions = self.client.get_latest_versions(self.model_name)
             return versions
@@ -78,7 +87,9 @@ class ModelPromoter:
             logger.error(f"Error getting model versions: {e}")
             return []
 
-    def validate_model_performance(self, model_uri, test_data_path="data/processed/test_data.pkl"):
+    def validate_model_performance(
+        self, model_uri, test_data_path="data/processed/test_data.pkl"
+    ):
         """Validate model performance against test data"""
         try:
             # Load test data
@@ -92,9 +103,9 @@ class ModelPromoter:
 
             # Calculate metrics
             accuracy = accuracy_score(y_test, y_pred)
-            precision = precision_score(y_test, y_pred, average='weighted')
-            recall = recall_score(y_test, y_pred, average='weighted')
-            f1 = f1_score(y_test, y_pred, average='weighted')
+            precision = precision_score(y_test, y_pred, average="weighted")
+            recall = recall_score(y_test, y_pred, average="weighted")
+            f1 = f1_score(y_test, y_pred, average="weighted")
 
             logger.info("Model Performance Validation:")
             logger.info(f"  Accuracy: {accuracy:.4f}")
@@ -104,17 +115,14 @@ class ModelPromoter:
 
             # Define validation criteria
             validation_passed = (
-                accuracy >= 0.90 and
-                precision >= 0.90 and
-                recall >= 0.90 and
-                f1 >= 0.90
+                accuracy >= 0.90 and precision >= 0.90 and recall >= 0.90 and f1 >= 0.90
             )
 
             return validation_passed, {
-                'accuracy': accuracy,
-                'precision': precision,
-                'recall': recall,
-                'f1_score': f1
+                "accuracy": accuracy,
+                "precision": precision,
+                "recall": recall,
+                "f1_score": f1,
             }
 
         except Exception as e:
@@ -140,12 +148,12 @@ class ModelPromoter:
             # Transition to Staging
             # print(f"Metrics: {self.client.get_run(run_id).data.metrics}")
             self.client.set_registered_model_alias(
-                name=self.model_name,
-                version=latest_version.version,
-                alias="Staging"
+                name=self.model_name, version=latest_version.version, alias="Staging"
             )
 
-            logger.info(f"✅ Model promoted to Staging - Version {latest_version.version}")
+            logger.info(
+                f"✅ Model promoted to Staging - Version {latest_version.version}"
+            )
             return True
 
         except Exception as e:
@@ -172,10 +180,16 @@ class ModelPromoter:
 
             if version:
                 # Find the ModelVersion object for the given version
-                all_versions = self.client.search_model_versions(f"name='{self.model_name}'")
-                target_version_obj = next((v for v in all_versions if int(v.version) == int(version)), None)
+                all_versions = self.client.search_model_versions(
+                    f"name='{self.model_name}'"
+                )
+                target_version_obj = next(
+                    (v for v in all_versions if int(v.version) == int(version)), None
+                )
                 if not target_version_obj:
-                    logger.error(f"Version {version} not found for model {self.model_name}")
+                    logger.error(
+                        f"Version {version} not found for model {self.model_name}"
+                    )
                     return False
             else:
                 target_version_obj = staging_versions[0]
@@ -185,7 +199,6 @@ class ModelPromoter:
             model_uri = f"models:/{self.model_name}/{target_version}"
             validation_passed, metrics = self.validate_model_performance(model_uri)
 
-
             if not validation_passed and not force:
                 logger.error("❌ Model validation failed. Use --force to override.")
                 return False
@@ -194,21 +207,21 @@ class ModelPromoter:
             prod_versions = self.get_model_alias("Production")
             if prod_versions:
                 current_prod_version = prod_versions[0].version
-                logger.info(f"Archiving current production model (Version {current_prod_version})")
+                logger.info(
+                    f"Archiving current production model (Version {current_prod_version})"
+                )
                 self.client.set_registered_model_alias(
-                    name=self.model_name,
-                    version=current_prod_version,
-                    alias="Archived"
+                    name=self.model_name, version=current_prod_version, alias="Archived"
                 )
 
             # Promote to Production
             self.client.set_registered_model_alias(
-                name=self.model_name,
-                version=target_version,
-                alias="Production"
+                name=self.model_name, version=target_version, alias="Production"
             )
 
-            local_path = mlflow.artifacts.download_artifacts(artifact_uri=target_version_obj.source)
+            local_path = mlflow.artifacts.download_artifacts(
+                artifact_uri=target_version_obj.source
+            )
             # Copy to your desired directory
             dst = "models/production_model"
             if os.path.exists(dst):
@@ -219,16 +232,18 @@ class ModelPromoter:
 
             # Log promotion event
             promotion_log = {
-                'timestamp': datetime.now().isoformat(),
-                'model_name': self.model_name,
-                'version': target_version,
-                'previous_production_version': current_prod_version if prod_versions else None,
-                'metrics': metrics,
-                'validation_passed': validation_passed,
-                'forced': force
+                "timestamp": datetime.now().isoformat(),
+                "model_name": self.model_name,
+                "version": target_version,
+                "previous_production_version": (
+                    current_prod_version if prod_versions else None
+                ),
+                "metrics": metrics,
+                "validation_passed": validation_passed,
+                "forced": force,
             }
 
-            with open('logs/promotion_history.json', 'a') as f:
+            with open("logs/promotion_history.json", "a") as f:
                 f.write(f"{promotion_log}\n")
 
             return True
@@ -250,16 +265,12 @@ class ModelPromoter:
 
             # Archive current production
             self.client.set_registered_model_alias(
-                name=self.model_name,
-                version=current_prod_version,
-                alias="Archived"
+                name=self.model_name, version=current_prod_version, alias="Archived"
             )
 
             # Promote target version to production
             self.client.set_registered_model_alias(
-                name=self.model_name,
-                version=target_version,
-                alias="Production"
+                name=self.model_name, version=target_version, alias="Production"
             )
 
             logger.info(f"✅ Production rolled back to Version {target_version}")
@@ -285,17 +296,17 @@ class ModelPromoter:
 
             # Calculate metrics
             metrics1 = {
-                'accuracy': accuracy_score(y_test, y_pred1),
-                'precision': precision_score(y_test, y_pred1, average='weighted'),
-                'recall': recall_score(y_test, y_pred1, average='weighted'),
-                'f1_score': f1_score(y_test, y_pred1, average='weighted')
+                "accuracy": accuracy_score(y_test, y_pred1),
+                "precision": precision_score(y_test, y_pred1, average="weighted"),
+                "recall": recall_score(y_test, y_pred1, average="weighted"),
+                "f1_score": f1_score(y_test, y_pred1, average="weighted"),
             }
 
             metrics2 = {
-                'accuracy': accuracy_score(y_test, y_pred2),
-                'precision': precision_score(y_test, y_pred2, average='weighted'),
-                'recall': recall_score(y_test, y_pred2, average='weighted'),
-                'f1_score': f1_score(y_test, y_pred2, average='weighted')
+                "accuracy": accuracy_score(y_test, y_pred2),
+                "precision": precision_score(y_test, y_pred2, average="weighted"),
+                "recall": recall_score(y_test, y_pred2, average="weighted"),
+                "f1_score": f1_score(y_test, y_pred2, average="weighted"),
             }
 
             logger.info("Model Comparison:")
@@ -308,10 +319,12 @@ class ModelPromoter:
             logger.error(f"Error comparing models: {e}")
             return None, None
 
+
 @click.group()
 def cli():
     """MLflow Model Promotion CLI"""
     pass
+
 
 @cli.command()
 @click.option("--model-name", default="iris_classifier", help="Name of the model")
@@ -319,6 +332,7 @@ def list_models(model_name):
     """List all registered models and their stages"""
     promoter = ModelPromoter(model_name)
     promoter.list_models()
+
 
 @cli.command()
 @click.option("--run-id", required=True, help="MLflow run ID")
@@ -333,8 +347,11 @@ def promote_to_staging(run_id, model_name):
         logger.error("Promotion to Staging failed")
         sys.exit(1)
 
+
 @cli.command()
-@click.option("--version", type=int, help="Specific version to promote (default: latest staging)")
+@click.option(
+    "--version", type=int, help="Specific version to promote (default: latest staging)"
+)
 @click.option("--force", is_flag=True, help="Force promotion even if validation fails")
 @click.option("--model-name", default="iris_classifier", help="Name of the model")
 def promote_to_production(version, force, model_name):
@@ -346,6 +363,7 @@ def promote_to_production(version, force, model_name):
     else:
         logger.error("❌ Promotion to Production failed")
         sys.exit(1)
+
 
 @cli.command()
 @click.option("--version", type=int, required=True, help="Version to rollback to")
@@ -360,6 +378,7 @@ def rollback(version, model_name):
         logger.error("❌ Rollback failed")
         sys.exit(1)
 
+
 @cli.command()
 @click.option("--version1", type=int, required=True, help="First version to compare")
 @click.option("--version2", type=int, required=True, help="Second version to compare")
@@ -368,6 +387,7 @@ def compare(version1, version2, model_name):
     """Compare performance of two model versions"""
     promoter = ModelPromoter(model_name)
     promoter.compare_models(version1, version2)
+
 
 if __name__ == "__main__":
     cli()

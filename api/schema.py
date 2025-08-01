@@ -1,12 +1,13 @@
-from pydantic import BaseModel, field_validator,Field
 from typing import List
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class IrisFeatures(BaseModel):
     data: List[List[float]] = Field(..., min_length=1)
 
-    @field_validator('data')
+    @field_validator("data")
     def check_inner_list_length(cls, v):
         if not all(len(inner) == 4 for inner in v):
-            raise ValueError('Each inner list must have exactly 4 floats')
+            raise ValueError("Each inner list must have exactly 4 floats")
         return v

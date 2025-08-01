@@ -1,15 +1,14 @@
-from fastapi import FastAPI
-import mlflow.pyfunc
-import pandas as pd
-from api.schema import IrisFeatures
+import datetime as dt
+import json
 import logging
 import sqlite3
-import json
-import datetime as dt
 
+import mlflow.pyfunc
+import pandas as pd
+from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 
-
+from api.schema import IrisFeatures
 
 app = FastAPI(
     title="Iris Classifier API",
@@ -28,17 +27,17 @@ logging.basicConfig(
 )
 
 conn = sqlite3.connect("logs/predictions.db", check_same_thread=False)
-conn.execute(
-    "CREATE TABLE IF NOT EXISTS logs (ts TEXT, features TEXT, preds TEXT);"
-)
+conn.execute("CREATE TABLE IF NOT EXISTS logs (ts TEXT, features TEXT, preds TEXT);")
+
 
 @app.get("/health")
 def health_check():
     """Health check endpoint for monitoring"""
     return {
         "status": "healthy",
-        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat()
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
+
 
 @app.get("/")
 def root():
@@ -47,8 +46,9 @@ def root():
         "message": "Iris Classifier API",
         "version": "1.0.0",
         "docs": "/docs",
-        "metrics": "/metrics"
+        "metrics": "/metrics",
     }
+
 
 @app.post("/predict")
 def predict(features: IrisFeatures):
@@ -62,8 +62,10 @@ def predict(features: IrisFeatures):
         return {"error": "Model not found"}
 
     columns = [
-        'sepal length (cm)', 'sepal width (cm)',
-        'petal length (cm)', 'petal width (cm)'
+        "sepal length (cm)",
+        "sepal width (cm)",
+        "petal length (cm)",
+        "petal width (cm)",
     ]
     df = pd.DataFrame(features.data, columns=columns)
     preds = model.predict(df)
@@ -74,8 +76,7 @@ def predict(features: IrisFeatures):
     )
     conn.commit()
     logging.info(
-        f"Prediction logged for {json.dumps(features.data)} "
-        f"as {json.dumps(preds.tolist())}"
+        f"Prediction logged for {json.dumps(features.data)} as {json.dumps(preds.tolist())}"
     )
 
     return {"predictions": preds.tolist()}
