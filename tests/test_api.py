@@ -23,7 +23,7 @@ def test_root_endpoint():
     assert data["version"] == "1.0.0"
 
 
-def test_predict_endpoint():
+def test_predict_endpoint(mock_mlflow_load_model):
     """Test prediction endpoint"""
     test_data = {"data": [[5.1, 3.5, 1.4, 0.2]]}
     response = client.post("/predict", json=test_data)

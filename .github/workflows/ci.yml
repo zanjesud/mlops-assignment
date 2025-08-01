@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: uv pip install  pytest pytest-cov ruff black isort mypy pre-commit
 
+      - name: Create necessary directories
+        run: |
+          mkdir -p logs
+          mkdir -p models/production_model
+          mkdir -p data/processed
+
       # - name: Run pre-commit hooks
       #   run: uv run pre-commit run --all-files
 
