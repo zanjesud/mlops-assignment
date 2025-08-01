@@ -35,7 +35,7 @@ jobs:
       #   run: uv run pre-commit run --all-files
 
       - name: Lint with ruff
-        run: uv run ruff . --select E,F,W
+        run: uv run ruff check . --select E,F,W
 
       - name: Check code format
         run: |
