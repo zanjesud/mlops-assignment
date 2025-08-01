@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Create virtual environment
+        run: uv venv .venv
+
+      - name: Install dependencies
+        run: uv pip install --editable . uv pytest pytest-cov ruff black isort mypy pre-commit
+
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+
+      - name: Lint with ruff
+        run: uv run ruff . --select E,F,W
+
+      - name: Check code format
+        run: |
+          uv run black --check .
+          uv run isort --check-only .
+          uv run mypy .
+
+      - name: Run unit tests
+        run: uv run pytest tests/test_api.py -v --cov=api --cov-report=xml
+
+      - name: Run integration tests
+        env:
+          API_URL: http://localhost:8000
+          UI_URL: http://localhost:8501
+        run: uv run pytest tests/test_end_to_end.py -v
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.xml
