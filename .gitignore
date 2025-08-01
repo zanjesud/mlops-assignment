@@ -18,8 +18,9 @@ confusion_matrix.csv
 feature_importance.csv
 
 # model export file 
-*.pkl
+# *.pkl
 
 #logs 
 logs/
 SteptoImplements.txt
+data/processed/test_data.pkl

@@ -15,6 +15,9 @@ import logging
 import sys
 from datetime import datetime
 import joblib
+import os
+import shutil
+
 
 # Setup logging
 logging.basicConfig(
@@ -172,13 +175,20 @@ class ModelPromoter:
                 logger.error("No model found in Staging stage")           
             
             if version:
-                target_version = version
+                # Find the ModelVersion object for the given version
+                all_versions = self.client.search_model_versions(f"name='{self.model_name}'")
+                target_version_obj = next((v for v in all_versions if int(v.version) == int(version)), None)
+                if not target_version_obj:
+                    logger.error(f"Version {version} not found for model {self.model_name}")
+                    return False
             else:
-                target_version = staging_versions[0].version
-            
+                target_version_obj = staging_versions[0]
+            target_version = int(target_version_obj.version)
+
             # Validate model performance
             model_uri = f"models:/{self.model_name}/{target_version}"
             validation_passed, metrics = self.validate_model_performance(model_uri)
+
             
             if not validation_passed and not force:
                 logger.error("❌ Model validation failed. Use --force to override.")
@@ -201,6 +211,13 @@ class ModelPromoter:
                 version=target_version,
                 alias="Production"
             )
+
+            local_path = mlflow.artifacts.download_artifacts(artifact_uri=target_version_obj.source)
+            # Copy to your desired directory
+            dst = "models/production_model"
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
+            shutil.copytree(local_path, dst)
             
             logger.info(f"✅ Model promoted to Production - Version {target_version}")
             
