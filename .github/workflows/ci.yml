@@ -29,7 +29,7 @@ jobs:
         run: uv venv .venv
 
       - name: Install dependencies
-        run: uv pip install --editable . uv pytest pytest-cov ruff black isort mypy pre-commit
+        run: uv pip install  pytest pytest-cov ruff black isort mypy pre-commit
 
       - name: Run pre-commit hooks
         run: uv run pre-commit run --all-files
