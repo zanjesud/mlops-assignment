@@ -3,37 +3,43 @@ version: '3.8'
 services:
   # MLflow Tracking Server
   mlflow:
-    image: python:3.11-slim
-    working_dir: /app
+    image: zanjesud/mlops-mlflow:latest
     ports:
       - "5000:5000"
     volumes:
       - ./mlruns:/app/mlruns
-      - ./pyproject.toml:/app/pyproject.toml
-      - ./uv.lock:/app/uv.lock
-    command: >
-      sh -c "pip install uv && uv pip install --system . && 
-             mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlruns/mlflow.db"
+      - ./logs:/app/logs
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
     networks:
       - mlops-network
+    restart: unless-stopped
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # FastAPI Application
+  api:
+    image: zanjesud/mlops-api:latest
     ports:
       - "8000:8000"
-      - "8501:8501"
     volumes:
       - ./mlruns:/app/mlruns
       - ./logs:/app/logs
     environment:
-      - API_URL=http://localhost:8000
       - MLFLOW_TRACKING_URI=http://mlflow:5000
     depends_on:
       - mlflow
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  # Streamlit UI
+  ui:
+    image: zanjesud/mlops-ui:latest
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
     networks:
       - mlops-network
     restart: unless-stopped
