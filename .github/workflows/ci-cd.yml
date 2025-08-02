@@ -154,20 +154,20 @@ jobs:
 
       - name: Update docker-compose with new images
         run: |
-          sed -i "s|image: .*mlops-api.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.sha }}|g" docker-compose.yml
-          sed -i "s|image: .*mlops-ui.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.sha }}|g" docker-compose.yml
-          sed -i "s|image: .*mlops-mlflow.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.sha }}|g" docker-compose.yml
+          sed -i "s|image: .*mlops-api.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}|g" docker-compose.yml
+          sed -i "s|image: .*mlops-ui.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}|g" docker-compose.yml
+          sed -i "s|image: .*mlops-mlflow.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}|g" docker-compose.yml
 
       - name: Test Docker images
         run: |
           # Test API image
-          docker run --rm -d --name test-api -p 8000:8000 ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.sha }}
+          docker run --rm -d --name test-api -p 8000:8000 ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}
           sleep 10
           curl -f http://localhost:8000/health || exit 1
           docker stop test-api
 
           # Test UI image
-          docker run --rm -d --name test-ui -p 8501:8501 ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.sha }}
+          docker run --rm -d --name test-ui -p 8501:8501 ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}
           sleep 15
           curl -f http://localhost:8501/_stcore/health || exit 1
           docker stop test-ui
@@ -182,9 +182,9 @@ jobs:
       - name: Deploy
         run: |
           echo "🚀 Deploying to ${{ job.environment }} environment"
-          echo "API Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.sha }}"
-          echo "UI Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.sha }}"
-          echo "MLflow Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.sha }}"
+          echo "API Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}"
+          echo "UI Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}"
+          echo "MLflow Image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}"
           # Add your deployment commands here
 
       - name: Notify success
