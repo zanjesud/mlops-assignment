@@ -115,7 +115,7 @@ jobs:
         run: |
           export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
           export IMAGE_TAG=${{ github.ref_name }}
-          docker compose -f .\docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
 
       - name: Tag and push images
         run: |
