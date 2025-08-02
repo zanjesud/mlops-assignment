@@ -7,6 +7,8 @@ import requests
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 UI_URL = os.getenv("UI_URL", "http://localhost:8501")
 
+pytestmark = pytest.mark.integration
+
 
 def test_api_health():
     """Test API health endpoint"""
