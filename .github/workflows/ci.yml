@@ -56,7 +56,7 @@ jobs:
         env:
           API_URL: http://localhost:8000
           UI_URL: http://localhost:8501
-        run: uv run pytest tests/test_end_to_end.py -v
+        run: uv run pytest tests/integration/test_end_to_end.py -v
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
