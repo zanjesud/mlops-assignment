@@ -3,7 +3,11 @@ version: '3.8'
 services:
   # MLflow Tracking Server
   mlflow:
-    image: zanjesud/mlops-mlflow:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: mlflow
+    image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-mlflow:${IMAGE_TAG:-latest}
     ports:
       - "5000:5000"
     volumes:
@@ -17,7 +21,11 @@ services:
 
   # FastAPI Application
   api:
-    image: zanjesud/mlops-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-api:${IMAGE_TAG:-latest}
     ports:
       - "8000:8000"
     volumes:
@@ -33,7 +41,11 @@ services:
 
   # Streamlit UI
   ui:
-    image: zanjesud/mlops-ui:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+    image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-ui:${IMAGE_TAG:-latest}
     ports:
       - "8501:8501"
     environment:

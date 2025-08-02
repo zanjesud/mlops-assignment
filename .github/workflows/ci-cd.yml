@@ -105,58 +105,32 @@ jobs:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ env.DOCKER_HUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.DOCKER_HUB_USERNAME }}/mlops-api
-            ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui
-            ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Create necessary directories
         run: |
           mkdir -p logs
           mkdir -p models/production_model
           mkdir -p data/processed
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          target: api
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-
-      - name: Build and push UI image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          target: ui
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-
-      - name: Build and push MLflow image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          target: mlflow
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-
-      - name: Update docker-compose with new images
+      - name: Build with docker-compose
         run: |
-          sed -i "s|image: .*mlops-api.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}|g" docker-compose.yml
-          sed -i "s|image: .*mlops-ui.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}|g" docker-compose.yml
-          sed -i "s|image: .*mlops-mlflow.*|image: ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}|g" docker-compose.yml
+          export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
+          export IMAGE_TAG=${{ github.ref_name }}
+          docker-compose build
+
+      - name: Tag and push images
+        run: |
+          # Tag images with branch name and latest
+          docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}
+          docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}
+          docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}
+          
+          # Push all tags
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:latest
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:latest
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:latest
+          docker push ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}
 
       - name: Test Docker images
         run: |
