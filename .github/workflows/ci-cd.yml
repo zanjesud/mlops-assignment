@@ -111,15 +111,14 @@ jobs:
           mkdir -p models/production_model
           mkdir -p data/processed
 
-      - name: Build with docker-compose
+      - name: Build and push images
         run: |
+          # Build images with latest tag first
           export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
-          export IMAGE_TAG=${{ github.ref_name }}
-          docker compose -f docker-compose.yml up -d
-
-      - name: Tag and push images
-        run: |
-          # Tag images with branch name and latest
+          export IMAGE_TAG=latest
+          docker compose build
+          
+          # Tag with branch name
           docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.ref_name }}
           docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-ui:${{ github.ref_name }}
           docker tag ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:latest ${{ env.DOCKER_HUB_USERNAME }}/mlops-mlflow:${{ github.ref_name }}
