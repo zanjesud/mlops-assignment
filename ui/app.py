@@ -1,9 +1,11 @@
 # src/ui/app.py
-import streamlit as st, requests, pandas as pd
 import os
 
+import requests
+import streamlit as st
+
 # Get API URL from environment variable or use default
-API_URL = os.getenv('API_URL', 'http://localhost:8000')
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.title("🌸 Iris Species Classifier")
 sl = st.slider("Sepal length (cm)", 4.0, 8.0, 5.1)
@@ -38,5 +40,5 @@ if st.sidebar.checkbox("Show API Status"):
             st.sidebar.success("✅ API is healthy")
         else:
             st.sidebar.error("❌ API health check failed")
-    except:
+    except Exception:
         st.sidebar.error("❌ Cannot connect to API")

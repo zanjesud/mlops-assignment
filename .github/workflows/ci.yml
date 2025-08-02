@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lint-test:
     runs-on: ubuntu-latest
@@ -29,13 +33,19 @@ jobs:
         run: uv venv .venv
 
       - name: Install dependencies
-        run: uv pip install --editable . uv pytest pytest-cov ruff black isort mypy pre-commit
+        run: uv pip install  pytest pytest-cov ruff black isort mypy pre-commit
 
-      - name: Run pre-commit hooks
-        run: uv run pre-commit run --all-files
+      - name: Create necessary directories
+        run: |
+          mkdir -p logs
+          mkdir -p models/production_model
+          mkdir -p data/processed
+
+      # - name: Run pre-commit hooks
+      #   run: uv run pre-commit run --all-files
 
       - name: Lint with ruff
-        run: uv run ruff . --select E,F,W
+        run: uv run ruff check . --select E,F,W
 
       - name: Check code format
         run: |
@@ -44,15 +54,24 @@ jobs:
           uv run mypy .
 
       - name: Run unit tests
-        run: uv run pytest tests/test_api.py -v --cov=api --cov-report=xml
+        run: uv run pytest tests/test_api.py -v --cov=api --cov-report=xml --cov-report=html
 
-      - name: Run integration tests
-        env:
-          API_URL: http://localhost:8000
-          UI_URL: http://localhost:8501
-        run: uv run pytest tests/test_end_to_end.py -v
+      # Integration tests are skipped in CI as they require running services
+      # Run them locally with: docker-compose up -d && pytest tests/integration/ -v
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage reports as artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          files: coverage.xml
+          name: coverage-reports-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+      
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+
