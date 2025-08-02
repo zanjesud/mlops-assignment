@@ -59,11 +59,6 @@ jobs:
       # Integration tests are skipped in CI as they require running services
       # Run them locally with: docker-compose up -d && pytest tests/integration/ -v
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: coverage.xml
-
       - name: Upload coverage reports as artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -73,5 +68,10 @@ jobs:
             coverage.xml
             htmlcov/
           retention-days: 30
+      
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
 
