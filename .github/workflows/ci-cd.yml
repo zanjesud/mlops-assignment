@@ -1,11 +1,17 @@
 name: CI-CD Pipeline
 
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
 on:
   workflow_run:
     workflows: ["CI"]
     types:
       - completed
     branches: [master, develop]
+  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       environment:
@@ -22,18 +28,33 @@ env:
   DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
 
 jobs:
-  # Only run if CI workflow succeeded
+  # Debug and check CI workflow success
   check-ci-success:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
     outputs:
       ci-success: ${{ steps.check.outputs.success }}
     steps:
+      - name: Debug workflow trigger
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+          echo "Workflow run name: ${{ github.event.workflow_run.name }}"
+          echo "Branch: ${{ github.ref }}"
+          
       - name: Check CI success
         id: check
         run: |
-          echo "CI workflow completed successfully"
-          echo "success=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Manual trigger - proceeding"
+            echo "success=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
+            echo "CI workflow completed successfully"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "CI workflow did not succeed"
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
 
   # Build and push Docker images
   build-and-push:
