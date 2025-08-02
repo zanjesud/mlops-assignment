@@ -1,12 +1,8 @@
 version: '3.8'
 
 services:
-  # MLflow Tracking Server
+  # MLflow Tracking Server - Pull from Docker Hub
   mlflow:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: mlflow
     image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-mlflow:${IMAGE_TAG:-latest}
     ports:
       - "5000:5000"
@@ -19,12 +15,8 @@ services:
       - mlops-network
     restart: unless-stopped
 
-  # FastAPI Application
+  # FastAPI Application - Pull from Docker Hub
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: api
     image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-api:${IMAGE_TAG:-latest}
     ports:
       - "8000:8000"
@@ -39,12 +31,8 @@ services:
       - mlops-network
     restart: unless-stopped
 
-  # Streamlit UI
+  # Streamlit UI - Pull from Docker Hub
   ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: ui
     image: ${DOCKER_HUB_USERNAME:-zanjesud}/mlops-ui:${IMAGE_TAG:-latest}
     ports:
       - "8501:8501"
@@ -55,39 +43,6 @@ services:
     networks:
       - mlops-network
     restart: unless-stopped
-
-  # # FastAPI Application
-  # api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.api
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./mlruns:/app/mlruns
-  #     - ./logs:/app/logs
-  #   environment:
-  #     - MLFLOW_TRACKING_URI=http://mlflow:5000
-  #   depends_on:
-  #     - mlflow
-  #   networks:
-  #     - mlops-network
-  #   restart: unless-stopped
-
-  # # Streamlit UI
-  # ui:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.ui
-  #   ports:
-  #     - "8501:8501"
-  #   environment:
-  #     - API_URL=http://api:8000
-  #   depends_on:
-  #     - api
-  #   networks:
-  #     - mlops-network
-  #   restart: unless-stopped
 
   # Prometheus for monitoring
   prometheus:
@@ -130,4 +85,4 @@ volumes:
 
 networks:
   mlops-network:
-    driver: bridge 
+    driver: bridge
