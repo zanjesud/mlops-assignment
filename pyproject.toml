@@ -1,13 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mlops-assignment"
 version = "0.1.0"
-description = "Add your description here"
+description = "MLOps Assignment - Complete ML Pipeline with Docker"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "black>=25.1.0",
     "dvc>=3.61.0",
     "dvc-gdrive>=3.0.1",
+    "fastapi>=0.115.6",
     "flake8>=7.3.0",
     "httpx>=0.28.1",
     "isort>=6.0.1",
@@ -24,4 +29,10 @@ dependencies = [
     "streamlit>=1.47.1",
     "types-requests>=2.32.4.20250611",
     "types-setuptools>=80.9.0.20250801",
+    "uvicorn>=0.34.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*", "models*", "data*"]
+exclude = ["tests*", "ui*", "monitoring*"]
