@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # MLflow Tracking Server - Pull from Docker Hub

@@ -1,6 +1,9 @@
 global:
-  scrape_interval: 15s
+  scrape_interval: 10s
   evaluation_interval: 15s
+  external_labels:
+    monitor: 'mlops-monitor'
+    environment: 'production'
 
 rule_files:
   # - "first_rules.yml"
@@ -11,23 +14,38 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
 
-  # FastAPI Application
-  - job_name: 'fastapi-app'
+  # FastAPI Application - Main API
+  - job_name: 'iris-classifier-api'
     static_configs:
       - targets: ['api:8000']
     metrics_path: '/metrics'
-    scrape_interval: 10s
-    scrape_timeout: 5s
+    scrape_interval: 5s
+    scrape_timeout: 3s
+    honor_labels: true
+    params:
+      format: ['prometheus']
 
-  # # MLflow Tracking Server
-  # - job_name: 'mlflow'
-  #   static_configs:
-  #     - targets: ['mlflow:5000']
-  #   scrape_interval: 30s
+  # MLflow Tracking Server
+  - job_name: 'mlflow-server'
+    static_configs:
+      - targets: ['mlflow:5000']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
 
-  # # Streamlit UI (if it exposes metrics)
-  # - job_name: 'streamlit-ui'
-  #   static_configs:
-  #     - targets: ['app:8501']
-  #   scrape_interval: 30s 
+  # Container metrics (if available)
+  - job_name: 'docker-containers'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+    scrape_interval: 30s
+    honor_labels: true
+
+  # Custom application metrics
+  - job_name: 'custom-metrics'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/custom-metrics'
+    scrape_interval: 15s 
