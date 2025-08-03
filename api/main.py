@@ -16,6 +16,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Custom metrics counters
+prediction_counter = 0
+species_predictions = {"setosa": 0, "versicolor": 0, "virginica": 0}
+species_map = {0: "setosa", 1: "versicolor", 2: "virginica"}
+
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
 # http://127.0.0.1:8000/metrics  enpoints for checking matrix
 
@@ -83,7 +88,26 @@ def predict(features: IrisFeatures):
             f"Prediction logged for {json.dumps(features.data)} as {json.dumps(preds.tolist())}"
         )
 
+        # Update custom metrics
+        global prediction_counter
+        prediction_counter += len(preds)
+        for pred in preds:
+            species_name = species_map.get(int(pred), "unknown")
+            if species_name in species_predictions:
+                species_predictions[species_name] += 1
+        
         return {"predictions": preds.tolist()}
     except Exception as e:
         logging.error(f"Error during prediction: {e}")
         return {"error": f"Prediction failed: {str(e)}"}
+
+
+@app.get("/custom-metrics")
+def custom_metrics():
+    """Custom metrics endpoint for enhanced monitoring"""
+    return {
+        "total_predictions": prediction_counter,
+        "species_breakdown": species_predictions,
+        "model_status": "loaded" if model is not None else "not_loaded",
+        "database_status": "connected"
+    }
