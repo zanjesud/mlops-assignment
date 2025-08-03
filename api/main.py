@@ -95,7 +95,7 @@ def predict(features: IrisFeatures):
             species_name = species_map.get(int(pred), "unknown")
             if species_name in species_predictions:
                 species_predictions[species_name] += 1
-        
+
         return {"predictions": preds.tolist()}
     except Exception as e:
         logging.error(f"Error during prediction: {e}")
@@ -109,5 +109,5 @@ def custom_metrics():
         "total_predictions": prediction_counter,
         "species_breakdown": species_predictions,
         "model_status": "loaded" if model is not None else "not_loaded",
-        "database_status": "connected"
+        "database_status": "connected",
     }
