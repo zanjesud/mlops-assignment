@@ -77,10 +77,10 @@ git clone https://github.com/zanjesud/mlops-assignment.git
 cd mlops-assignment
 
 # Build and start all services
-docker-compose up --build
+docker-compose -f docker-compose.local.yml pull		
 
 # Or run in background
-docker-compose up -d --build
+docker-compose -f docker-compose.local.yml up -d
 ```
 
 ### 🐍 Option 2: Local Development
@@ -96,12 +96,14 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e .
 
 # Initialize DVC and download data
-dvc init
 dvc pull
 
+# Create logs directory
+mkdir -p logs
+
 # Start services
-mlflow server --host 0.0.0.0 --port 5000 &
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000 &
+mlflow server --host 0.0.0.0 --port 5000
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 streamlit run ui/app.py --server.port 8501
 ```
 
@@ -148,7 +150,7 @@ dvc init
 #### Google Drive Remote Setup
 ```bash
 # Add Google Drive as remote storage
-dvc remote add --default gdrive gdrive://14v9yGR-7czWk9DnTUPvd2Gp1xSPoeHug
+dvc remote add --default gdrive gdrive://<your Gdrive id>
 dvc remote modify gdrive gdrive_acknowledge_abuse true
 
 # Setup Google Cloud OAuth (follow DVC docs)
@@ -243,6 +245,8 @@ EOF
 # Train models
 python models/train.py --model_type=rf --random_state=42
 python models/train.py --model_type=rf --random_state=100
+uv run python models/train.py --model_type rf --random_state 123
+uv run python models/train.py --model_type logreg --random_state 100
 ```
 
 #### Model Promotion System
@@ -689,11 +693,21 @@ uv run pre-commit run --all-files
 
 | Issue | Solution |
 |-------|----------|
+| **MLflow pip version warning** | Harmless warning when using UV - can be ignored |
 | **Port conflicts** | Check if ports 8000, 8501, 5000, 9090, 3000 are available |
 | **MLflow connection** | Ensure MLflow server is running before API |
 | **Model loading** | Verify model is registered in MLflow registry |
 | **DVC remote** | Check Google Drive credentials and permissions |
 | **Docker build fails** | Clear Docker cache: `docker system prune -a` |
+
+### Setup Warnings
+
+#### MLflow Pip Version Warning
+This warning is harmless and can be ignored:
+```
+WARNING mlflow.utils.environment: Failed to resolve installed pip version
+```
+It occurs because MLflow can't detect pip version in UV environments. Your models will still work correctly.
 
 ### Debug Commands
 
