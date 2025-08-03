@@ -29,9 +29,13 @@ if st.button("Predict"):
             st.success(f"Model predicts species: **{pred_num} ({pred_name})**")
             st.balloons()
         except requests.exceptions.Timeout:
-            st.error("⏰ Request timed out. The model is still loading. Please try again in a few seconds.")
+            st.error(
+                "⏰ Request timed out. The model is still loading. Please try again in a few seconds."
+            )
         except requests.exceptions.ConnectionError:
-            st.error("🔌 Cannot connect to API. Please check if the API service is running.")
+            st.error(
+                "🔌 Cannot connect to API. Please check if the API service is running."
+            )
         except requests.exceptions.RequestException as e:
             st.error(f"Error connecting to API: {e}")
         except Exception as e:
@@ -40,7 +44,9 @@ if st.button("Predict"):
 # Add API status check
 if st.sidebar.checkbox("Show API Status"):
     try:
-        health_resp = requests.get(f"{API_URL}/health", timeout=5)  # Increased from 2 to 5 seconds
+        health_resp = requests.get(
+            f"{API_URL}/health", timeout=5
+        )  # Increased from 2 to 5 seconds
         if health_resp.status_code == 200:
             health_data = health_resp.json()
             if health_data.get("model_loaded", False):
