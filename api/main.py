@@ -64,7 +64,6 @@ def predict(features: IrisFeatures):
     if model is None:
         logging.error("Model not loaded")
         return {"error": "Model not available"}
-    
     try:
         columns = [
             "sepal length (cm)",
