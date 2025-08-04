@@ -121,18 +121,23 @@ jobs:
       - name: Check if data changed
         id: data_check
         run: |
-          echo "Checking for data changes..."
+          DATA_CHANGED=false
           
-          # Check if iris.csv.dvc was modified in this push
-          if git diff --name-only HEAD~1 HEAD | grep -q "data/raw/iris.csv.dvc"; then
-            echo "data_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ iris.csv.dvc was modified - will train model"
+          # Check if iris.csv.dvc was modified in this commit
+          if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
+            echo "✅ iris.csv.dvc was modified in this commit"
+            DATA_CHANGED=true
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "✅ Manual workflow trigger"
+            DATA_CHANGED=true
+          fi
+          
+          if [ "$DATA_CHANGED" = "true" ]; then
             echo "data_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ Manual trigger - will train model"
+            echo "Will train model on updated data"
           else
             echo "data_changed=false" >> $GITHUB_OUTPUT
-            echo "❌ No data changes detected - skipping model training"
+            echo "No data changes detected - skipping model training"
           fi
       
       - name: Setup data
