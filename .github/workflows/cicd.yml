@@ -1,4 +1,4 @@
-name: Unified MLOps CI/CD Pipeline
+name: MLOps CI/CD Pipeline
 
 on:
   push:
