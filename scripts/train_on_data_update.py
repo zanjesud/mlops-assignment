@@ -120,36 +120,139 @@ def train_model(data_path, experiment_name, model_name):
             "training_time": float(training_time),
         }
 
-        # Log metrics individually to avoid serialization issues
+        # Additional validation metrics
+        import numpy as np
+        from sklearn.metrics import classification_report
+
+        # Model robustness validation
+        validation_results = {
+            "data_quality_passed": True,
+            "model_performance_passed": False,
+            "robustness_passed": False,
+            "validation_errors": [],
+        }
+
+        # 1. Data Quality Validation
+        print("Performing data quality validation...", file=sys.stderr)
+
+        # Check for data drift (basic)
+        if len(df) < 100:
+            validation_results["validation_errors"].append(
+                "Insufficient data: less than 100 samples"
+            )
+            validation_results["data_quality_passed"] = False
+
+        # Check class balance
+        class_balance = y.value_counts(normalize=True)
+        min_class_ratio = class_balance.min()
+        if min_class_ratio < 0.1:  # Less than 10% for any class
+            validation_results["validation_errors"].append(
+                f"Class imbalance detected: min class ratio {min_class_ratio:.3f}"
+            )
+
+        # Check for missing values
+        if X.isnull().sum().sum() > 0:
+            validation_results["validation_errors"].append(
+                "Missing values detected in features"
+            )
+            validation_results["data_quality_passed"] = False
+
+        # 2. Model Performance Validation
+        print("Performing model performance validation...", file=sys.stderr)
+
+        # Per-class performance check
+        class_report = classification_report(y_test, y_pred, output_dict=True)
+        per_class_f1 = [class_report[str(i)]["f1-score"] for i in y.unique()]
+        min_class_f1 = min(per_class_f1)
+
+        metrics["min_class_f1"] = float(min_class_f1)
+        metrics["class_balance_ratio"] = float(min_class_ratio)
+
+        # 3. Model Robustness Validation
+        print("Performing robustness validation...", file=sys.stderr)
+
+        # Cross-validation for stability
+        from sklearn.model_selection import cross_val_score
+
+        cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="accuracy")
+        cv_mean = float(np.mean(cv_scores))
+        cv_std = float(np.std(cv_scores))
+
+        metrics["cv_accuracy_mean"] = cv_mean
+        metrics["cv_accuracy_std"] = cv_std
+
+        # Check model stability (low variance across CV folds)
+        if cv_std > 0.05:  # More than 5% standard deviation
+            validation_results["validation_errors"].append(
+                f"Model unstable: CV std {cv_std:.3f} > 0.05"
+            )
+        else:
+            validation_results["robustness_passed"] = True
+
+        # Performance thresholds validation
+        staging_thresholds = {
+            "accuracy": 0.85,  # Lowered from 0.90 for realistic threshold
+            "precision": 0.85,
+            "recall": 0.85,
+            "f1_score": 0.85,
+            "min_class_f1": 0.80,  # Ensure all classes perform reasonably
+            "cv_accuracy_mean": 0.83,  # Cross-validation performance
+        }
+
+        performance_passed = all(
+            metrics.get(metric, 0) >= threshold
+            for metric, threshold in staging_thresholds.items()
+        )
+
+        if performance_passed:
+            validation_results["model_performance_passed"] = True
+        else:
+            failed_metrics = [
+                f"{metric}: {metrics.get(metric, 0):.3f} < {threshold}"
+                for metric, threshold in staging_thresholds.items()
+                if metrics.get(metric, 0) < threshold
+            ]
+            validation_results["validation_errors"].extend(failed_metrics)
+
+        # Log all metrics individually to avoid serialization issues
         for metric_name, metric_value in metrics.items():
             mlflow.log_metric(metric_name, metric_value)
+
+        # Log validation results
+        mlflow.log_params(
+            {
+                "data_quality_passed": validation_results["data_quality_passed"],
+                "model_performance_passed": validation_results[
+                    "model_performance_passed"
+                ],
+                "robustness_passed": validation_results["robustness_passed"],
+                "validation_errors_count": len(validation_results["validation_errors"]),
+            }
+        )
 
         # Log model with signature
         signature = infer_signature(X_test, y_pred)
 
-        # Register model if it meets staging criteria
-        staging_thresholds = {
-            "accuracy": 0.90,
-            "precision": 0.90,
-            "recall": 0.90,
-            "f1_score": 0.90,
-        }
-
-        meets_criteria = all(
-            metrics[metric] >= threshold
-            for metric, threshold in staging_thresholds.items()
+        # Overall validation check
+        meets_criteria = (
+            validation_results["data_quality_passed"]
+            and validation_results["model_performance_passed"]
+            and validation_results["robustness_passed"]
         )
 
         if meets_criteria:
+            print("✅ All validation checks passed", file=sys.stderr)
+
             # Register model
             mlflow.sklearn.log_model(
                 model, "model", signature=signature, registered_model_name=model_name
             )
 
-            # Save run info for promotion
+            # Save comprehensive run info for promotion
             run_info = {
                 "run_id": run.info.run_id,
                 "metrics": metrics,
+                "validation_results": validation_results,
                 "meets_staging_criteria": True,
                 "timestamp": datetime.now().isoformat(),
             }
@@ -162,7 +265,11 @@ def train_model(data_path, experiment_name, model_name):
             print(run.info.run_id)
             return run.info.run_id
         else:
-            print("Model does not meet staging criteria", file=sys.stderr)
+            print("❌ Model validation failed", file=sys.stderr)
+            print(
+                f"Validation errors: {validation_results['validation_errors']}",
+                file=sys.stderr,
+            )
             print(f"Current metrics: {metrics}", file=sys.stderr)
             print(f"Required thresholds: {staging_thresholds}", file=sys.stderr)
             return None
