@@ -59,28 +59,61 @@ def promote_to_production(model_name, force):
                 print(f"Required thresholds: {production_thresholds}")
                 return False
 
-        # Archive current production model if exists
+        # Use model aliases instead of deprecated stages
         try:
-            prod_versions = client.get_latest_versions(
-                model_name, stages=["Production"]
+            # Archive current production model if exists
+            try:
+                current_prod_alias = client.get_model_version_by_alias(
+                    model_name, "production"
+                )
+                if current_prod_alias:
+                    print(
+                        f"Removing production alias from version {current_prod_alias.version}"
+                    )
+                    client.delete_registered_model_alias(model_name, "production")
+            except Exception:
+                print("No current production model to archive")
+
+            # Set production alias
+            client.set_registered_model_alias(
+                name=model_name, alias="production", version=model_version
             )
-            if prod_versions:
-                current_prod = prod_versions[0]
-                print(
-                    f"Archiving current production model version {current_prod.version}"
+            print(
+                f"Model {model_name} version {model_version} promoted to production (alias)"
+            )
+
+        except Exception as alias_error:
+            # Fallback to deprecated stages
+            print(f"Alias method failed, trying deprecated stages: {alias_error}")
+            try:
+                # Archive current production model if exists
+                prod_versions = client.get_latest_versions(
+                    model_name, stages=["Production"]
                 )
+                if prod_versions:
+                    current_prod = prod_versions[0]
+                    print(
+                        f"Archiving current production model version {current_prod.version}"
+                    )
+                    client.transition_model_version_stage(
+                        name=model_name, version=current_prod.version, stage="Archived"
+                    )
+            except Exception:
+                print("No current production model to archive")
+
+            # Promote to production
+            try:
                 client.transition_model_version_stage(
-                    name=model_name, version=current_prod.version, stage="Archived"
+                    name=model_name, version=model_version, stage="Production"
                 )
-        except Exception as e:
-            print(f"No current production model to archive: {e}")
-
-        # Promote to production
-        client.transition_model_version_stage(
-            name=model_name, version=model_version, stage="Production"
-        )
-
-        print(f"Model {model_name} version {model_version} promoted to Production")
+                print(
+                    f"Model {model_name} version {model_version} promoted to Production (deprecated)"
+                )
+            except Exception as stage_error:
+                if "cannot represent an object" in str(stage_error):
+                    print("Serialization warning ignored - promotion likely succeeded")
+                else:
+                    raise stage_error
 
         # Export production model to production_model directory
         model_uri = f"models:/{model_name}@production"

@@ -1,17 +1,28 @@
-name: Unified MLOps CI/CD Pipeline
+name: MLOps CI/CD Pipeline
 
 on:
   push:
     branches: [master, develop]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
+    paths:
+      - 'data/raw/iris.csv.dvc'
+      - 'api/**'
+      - 'ui/**'
+      - 'models/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/**'
   pull_request:
     branches: [master]
   workflow_dispatch:
     inputs:
       force_promotion:
         description: 'Force promotion to production'
+        required: false
+        default: false
+        type: boolean
+      trigger_training:
+        description: 'Force model training'
         required: false
         default: false
         type: boolean
@@ -53,6 +64,19 @@ jobs:
       - name: Install dependencies
         run: uv pip install -e .
       
+      - name: Setup DVC and pull data for tests
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -f "data/raw/iris.csv.dvc" ] && [ ! -f "data/raw/iris.csv" ]; then
+            echo "Setting up DVC with service account..."
+            echo "$GDRIVE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive_service_account.json
+            uv run dvc remote modify gdrive gdrive_use_service_account true
+            uv run dvc remote modify gdrive gdrive_service_account_json_file_path /tmp/gdrive_service_account.json
+            uv run dvc pull data/raw/iris.csv.dvc || echo "DVC pull failed, continuing with existing data"
+            rm -f /tmp/gdrive_service_account.json
+          fi
+      
       - name: Create necessary directories
         run: mkdir -p logs artifacts data/processed models/production_model
       
@@ -69,9 +93,6 @@ jobs:
         run: uv run pytest tests/test_api.py -v --cov=api --cov-report=xml --cov-report=html
       
       - name: Run model evaluation tests
-        run: uv run pytest tests/test_model_evaluation.py -v --cov=models --cov-append --cov-report=xml --cov-report=html
-      
-      - name: Run model evaluation tests (if available)
         run: |
           if [ -f "tests/test_model_evaluation.py" ]; then
             uv run pytest tests/test_model_evaluation.py -v --cov=models --cov-append --cov-report=xml --cov-report=html
@@ -89,7 +110,7 @@ jobs:
             htmlcov/
           retention-days: 30
 
-  # Stage 2: Data-Driven Model Training (only if data changed)
+  # Stage 2: Data-Driven Model Training
   model-training:
     runs-on: ubuntu-latest
     name: "Model Training & Validation"
@@ -121,46 +142,62 @@ jobs:
       - name: Check if data changed
         id: data_check
         run: |
-          echo "Checking for data changes..."
+          DATA_CHANGED=false
           
-          # Check if iris.csv.dvc was modified in this push
-          if git diff --name-only HEAD~1 HEAD | grep -q "data/raw/iris.csv.dvc"; then
-            echo "data_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ iris.csv.dvc was modified - will train model"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "data_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ Manual trigger - will train model"
-          else
-            echo "data_changed=false" >> $GITHUB_OUTPUT
-            echo "❌ No data changes detected - skipping model training"
+          # Check if iris.csv.dvc was modified
+          if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
+            echo "✅ DVC file changed - triggering model training"
+            DATA_CHANGED=true
           fi
+          
+          # Manual workflow trigger
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.trigger_training }}" = "true" ]; then
+            echo "✅ Manual training trigger"
+            DATA_CHANGED=true
+          fi
+          
+          echo "data_changed=$DATA_CHANGED" >> $GITHUB_OUTPUT
       
-      - name: Setup data
+      - name: Setup DVC and pull updated data
         if: steps.data_check.outputs.data_changed == 'true'
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: |
+          echo "Setting up DVC with service account authentication..."
+          echo "$GDRIVE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive_service_account.json
+          
+          # Configure DVC to use service account
+          uv run dvc remote modify gdrive gdrive_use_service_account true
+          uv run dvc remote modify gdrive gdrive_service_account_json_file_path /tmp/gdrive_service_account.json
+          
+          # Pull updated data
+          echo "Pulling updated data with DVC..."
+          uv run dvc pull data/raw/iris.csv.dvc
+          
+          # Clean up service account file
+          rm -f /tmp/gdrive_service_account.json
+          
+          # Validate data exists
           if [ ! -f "data/raw/iris.csv" ]; then
-            echo "Creating sample iris data..."
-            python -c "
-            from sklearn.datasets import load_iris
-            import pandas as pd
-            iris = load_iris(as_frame=True)
-            df = pd.concat([iris.data, pd.Series(iris.target, name='target')], axis=1)
-            df.to_csv('data/raw/iris.csv', index=False)
-            "
+            echo "Error: iris.csv not found after DVC pull"
+            exit 1
           fi
+          
+          echo "Data validation passed: $(wc -l < data/raw/iris.csv) lines"
       
       - name: Train and validate model
         id: training
         if: steps.data_check.outputs.data_changed == 'true'
         run: |
-          echo "Starting model training..."
+          echo "Starting model training on updated data..."
           
-          # Train model
+          # Train model and capture run ID
           RUN_ID=$(uv run python scripts/train_on_data_update.py 2>&1 | tail -n 1 | grep -E '^[a-f0-9]{32}$')
           
           if [ ! -z "$RUN_ID" ]; then
             echo "model_trained=true" >> $GITHUB_OUTPUT
             echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+            echo "Model training successful. Run ID: $RUN_ID"
             
             # Promote to staging
             if uv run python scripts/promote_to_staging.py --run_id $RUN_ID; then
@@ -199,7 +236,7 @@ jobs:
             models/production_model/
           retention-days: 30
 
-  # Stage 3: Build & Deploy (always runs, but uses updated model if available)
+  # Stage 3: Build & Deploy
   build-and-deploy:
     runs-on: ubuntu-latest
     name: "Build & Deploy"
@@ -208,6 +245,29 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Setup Python for DVC
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install DVC and pull data for Docker build
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install uv
+          uv venv .venv
+          uv pip install dvc[gdrive]
+          
+          # Pull data if DVC file exists
+          if [ -f "data/raw/iris.csv.dvc" ]; then
+            echo "Setting up DVC for Docker build..."
+            echo "$GDRIVE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive_service_account.json
+            uv run dvc remote modify gdrive gdrive_use_service_account true
+            uv run dvc remote modify gdrive gdrive_service_account_json_file_path /tmp/gdrive_service_account.json
+            uv run dvc pull data/raw/iris.csv.dvc || echo "DVC pull failed, using cached data"
+            rm -f /tmp/gdrive_service_account.json
+          fi
       
       - name: Download model artifacts (if available)
         if: needs.model-training.outputs.model_trained == 'true'
@@ -241,30 +301,29 @@ jobs:
         id: tags
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=latest" >> $GITHUB_OUTPUT
           else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
           
           # Add model update suffix if model was updated
           if [ "${{ needs.model-training.outputs.model_updated }}" = "true" ]; then
-            echo "model_suffix=-model-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+            echo "MODEL_SUFFIX=-model-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
           else
-            echo "model_suffix=" >> $GITHUB_OUTPUT
+            echo "MODEL_SUFFIX=" >> $GITHUB_OUTPUT
           fi
       
       - name: Build and push Docker images
         run: |
+          # Build images with latest tag first
           export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
           export IMAGE_TAG=latest
-          
-          # Build all services with latest tag first
           docker compose build
           
           # Create additional tags
-          FINAL_TAG=${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          FINAL_TAG=${{ steps.tags.outputs.IMAGE_TAG }}${{ steps.tags.outputs.MODEL_SUFFIX }}
           
           # Tag images with final tag
           docker tag $DOCKER_HUB_USERNAME/mlops-api:latest $DOCKER_HUB_USERNAME/mlops-api:$FINAL_TAG
@@ -297,7 +356,7 @@ jobs:
           
           docker stop test-api
 
-  # Stage 4: Notification & Summary
+  # Stage 4: Pipeline Summary
   notify:
     runs-on: ubuntu-latest
     name: "Pipeline Summary"
@@ -307,7 +366,7 @@ jobs:
     steps:
       - name: Pipeline Summary
         run: |
-          echo "=== Unified MLOps Pipeline Summary ==="
+          echo "=== MLOps CI/CD Pipeline Summary ==="
           echo "Quality Check: ${{ needs.quality-check.result }}"
           echo "Model Training: ${{ needs.model-training.result }}"
           echo "Build & Deploy: ${{ needs.build-and-deploy.result }}"
@@ -316,7 +375,8 @@ jobs:
             if [ "${{ needs.model-training.outputs.model_updated }}" = "true" ]; then
               echo "🎉 Full pipeline with model update completed!"
               echo "✅ Code quality checks passed"
-              echo "✅ Model retrained and promoted to production"
+              echo "✅ Model retrained on updated data"
+              echo "✅ Model promoted to production"
               echo "✅ Docker images built with updated model"
             else
               echo "✅ Standard pipeline completed successfully!"
