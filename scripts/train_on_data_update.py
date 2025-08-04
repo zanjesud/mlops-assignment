@@ -47,7 +47,10 @@ def train_model(data_path, experiment_name, model_name):
         # Load and validate data
         try:
             df = pd.read_csv(data_path)
-            print(f"Loaded data: {len(df)} rows, {len(df.columns)} columns", file=sys.stderr)
+            print(
+                f"Loaded data: {len(df)} rows, {len(df.columns)} columns",
+                file=sys.stderr,
+            )
         except Exception as e:
             print(f"Error loading data: {e}", file=sys.stderr)
             return None
@@ -61,7 +64,10 @@ def train_model(data_path, experiment_name, model_name):
             "target",
         ]
         if not all(col in df.columns for col in required_columns):
-            print(f"Missing required columns. Expected: {required_columns}", file=sys.stderr)
+            print(
+                f"Missing required columns. Expected: {required_columns}",
+                file=sys.stderr,
+            )
             return None
 
         # Prepare data
