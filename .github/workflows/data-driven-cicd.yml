@@ -71,21 +71,22 @@ jobs:
       
       - name: Setup DVC and pull data
         env:
-          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: |
-          # Configure DVC with secrets (ensure they are strings)
-          uv run dvc remote modify gdrive gdrive_client_id "$GDRIVE_CLIENT_ID"
-          uv run dvc remote modify gdrive gdrive_client_secret "$GDRIVE_CLIENT_SECRET"
+          # Setup service account authentication
+          echo "$GDRIVE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive_service_account.json
+          
+          # Configure DVC to use service account
+          uv run dvc remote modify gdrive gdrive_use_service_account true
+          uv run dvc remote modify gdrive gdrive_service_account_json_file_path /tmp/gdrive_service_account.json
           
           # Pull updated data
-          echo "Pulling data with DVC..."
-          uv run dvc pull data/raw/iris.csv.dvc || {
-            echo "DVC pull failed, trying to authenticate..."
-            uv run dvc remote modify gdrive gdrive_use_service_account false
-            uv run dvc pull data/raw/iris.csv.dvc
-          }
+          echo "Pulling data with DVC using service account..."
+          uv run dvc pull data/raw/iris.csv.dvc
           echo "Data pulled successfully"
+          
+          # Clean up service account file
+          rm -f /tmp/gdrive_service_account.json
           
           # Validate data exists
           if [ ! -f "data/raw/iris.csv" ]; then
@@ -296,4 +297,5 @@ jobs:
             echo "❌ Production promotion skipped (not on master branch)"
           else
             echo "❌ Pipeline failed"
+          fi
           fi
