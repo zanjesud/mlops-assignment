@@ -1,0 +1,301 @@
+name: Unified MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [master, develop]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      force_promotion:
+        description: 'Force promotion to production'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+  actions: read
+
+env:
+  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+jobs:
+  # Stage 1: Code Quality & Testing
+  quality-check:
+    runs-on: ubuntu-latest
+    name: "Code Quality & Testing"
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+      fail-fast: false
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install uv
+        run: pip install uv
+      
+      - name: Create virtual environment
+        run: uv venv .venv
+      
+      - name: Install dependencies
+        run: uv pip install -e .
+      
+      - name: Create necessary directories
+        run: mkdir -p logs artifacts data/processed models/production_model
+      
+      - name: Lint with ruff
+        run: uv run ruff check . --select E,F,W
+      
+      - name: Check code format
+        run: |
+          uv run black --check .
+          uv run isort --check-only .
+          uv run mypy .
+      
+      - name: Run unit tests
+        run: uv run pytest tests/test_api.py -v --cov=api --cov-report=xml --cov-report=html
+      
+      - name: Run model evaluation tests
+        run: uv run pytest tests/test_model_evaluation.py -v --cov=models --cov-append --cov-report=xml --cov-report=html
+      
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+  # Stage 2: Data-Driven Model Training (only if data changed)
+  model-training:
+    runs-on: ubuntu-latest
+    name: "Model Training & Validation"
+    needs: quality-check
+    if: |
+      needs.quality-check.result == 'success' && 
+      (contains(github.event.head_commit.modified, 'data/raw/iris.csv.dvc') || 
+       github.event_name == 'workflow_dispatch')
+    
+    outputs:
+      model_trained: ${{ steps.training.outputs.model_trained }}
+      run_id: ${{ steps.training.outputs.run_id }}
+      model_updated: ${{ steps.training.outputs.model_updated }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv venv .venv
+          uv pip install -e .
+      
+      - name: Create directories
+        run: mkdir -p logs artifacts data/processed models/production_model
+      
+      - name: Setup data
+        run: |
+          if [ ! -f "data/raw/iris.csv" ]; then
+            echo "Creating sample iris data..."
+            python -c "
+            from sklearn.datasets import load_iris
+            import pandas as pd
+            iris = load_iris(as_frame=True)
+            df = pd.concat([iris.data, pd.Series(iris.target, name='target')], axis=1)
+            df.to_csv('data/raw/iris.csv', index=False)
+            "
+          fi
+      
+      - name: Train and validate model
+        id: training
+        run: |
+          echo "Starting model training..."
+          
+          # Train model
+          RUN_ID=$(uv run python scripts/train_on_data_update.py 2>&1 | tail -n 1 | grep -E '^[a-f0-9]{32}$')
+          
+          if [ ! -z "$RUN_ID" ]; then
+            echo "model_trained=true" >> $GITHUB_OUTPUT
+            echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+            
+            # Promote to staging
+            if uv run python scripts/promote_to_staging.py --run_id $RUN_ID; then
+              echo "Model promoted to staging"
+              
+              # If on master, promote to production
+              if [ "${{ github.ref }}" = "refs/heads/master" ] || [ "${{ github.event.inputs.force_promotion }}" = "true" ]; then
+                if uv run python scripts/promote_to_production.py; then
+                  echo "model_updated=true" >> $GITHUB_OUTPUT
+                  echo "Model promoted to production and workspace updated"
+                else
+                  echo "model_updated=false" >> $GITHUB_OUTPUT
+                fi
+              else
+                echo "model_updated=false" >> $GITHUB_OUTPUT
+                echo "Skipping production promotion (not on master)"
+              fi
+            else
+              echo "model_updated=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "model_trained=false" >> $GITHUB_OUTPUT
+            echo "model_updated=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Upload model artifacts
+        if: steps.training.outputs.model_trained == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            artifacts/
+            logs/
+            models/production_model/
+          retention-days: 30
+
+  # Stage 3: Build & Deploy (always runs, but uses updated model if available)
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    name: "Build & Deploy"
+    needs: [quality-check, model-training]
+    if: always() && needs.quality-check.result == 'success'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download model artifacts (if available)
+        if: needs.model-training.outputs.model_trained == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
+          path: .
+      
+      - name: Commit updated production model
+        if: needs.model-training.outputs.model_updated == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add models/production_model/
+          if ! git diff --staged --quiet; then
+            git commit -m "Update production model from CI/CD [skip ci]"
+            git push
+          fi
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ env.DOCKER_HUB_TOKEN }}
+      
+      - name: Determine image tags
+        id: tags
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+          
+          # Add model update suffix if model was updated
+          if [ "${{ needs.model-training.outputs.model_updated }}" = "true" ]; then
+            echo "model_suffix=-model-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          else
+            echo "model_suffix=" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build and push Docker images
+        run: |
+          export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
+          export IMAGE_TAG=${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          
+          # Build all services
+          docker compose build
+          
+          # Tag images
+          docker tag $DOCKER_HUB_USERNAME/mlops-api:latest $DOCKER_HUB_USERNAME/mlops-api:$IMAGE_TAG
+          docker tag $DOCKER_HUB_USERNAME/mlops-ui:latest $DOCKER_HUB_USERNAME/mlops-ui:$IMAGE_TAG
+          docker tag $DOCKER_HUB_USERNAME/mlops-mlflow:latest $DOCKER_HUB_USERNAME/mlops-mlflow:$IMAGE_TAG
+          
+          # Push images
+          docker push $DOCKER_HUB_USERNAME/mlops-api:latest
+          docker push $DOCKER_HUB_USERNAME/mlops-api:$IMAGE_TAG
+          docker push $DOCKER_HUB_USERNAME/mlops-ui:latest
+          docker push $DOCKER_HUB_USERNAME/mlops-ui:$IMAGE_TAG
+          docker push $DOCKER_HUB_USERNAME/mlops-mlflow:latest
+          docker push $DOCKER_HUB_USERNAME/mlops-mlflow:$IMAGE_TAG
+      
+      - name: Test Docker images
+        run: |
+          echo "Testing API image..."
+          docker run --rm -d --name test-api -p 8000:8000 ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          
+          sleep 15
+          
+          if curl -f http://localhost:8000/health; then
+            echo "✅ API health check passed!"
+          else
+            echo "❌ API health check failed"
+            docker logs test-api
+            docker stop test-api
+            exit 1
+          fi
+          
+          docker stop test-api
+
+  # Stage 4: Notification & Summary
+  notify:
+    runs-on: ubuntu-latest
+    name: "Pipeline Summary"
+    needs: [quality-check, model-training, build-and-deploy]
+    if: always()
+    
+    steps:
+      - name: Pipeline Summary
+        run: |
+          echo "=== Unified MLOps Pipeline Summary ==="
+          echo "Quality Check: ${{ needs.quality-check.result }}"
+          echo "Model Training: ${{ needs.model-training.result }}"
+          echo "Build & Deploy: ${{ needs.build-and-deploy.result }}"
+          
+          if [ "${{ needs.build-and-deploy.result }}" = "success" ]; then
+            if [ "${{ needs.model-training.outputs.model_updated }}" = "true" ]; then
+              echo "🎉 Full pipeline with model update completed!"
+              echo "✅ Code quality checks passed"
+              echo "✅ Model retrained and promoted to production"
+              echo "✅ Docker images built with updated model"
+            else
+              echo "✅ Standard pipeline completed successfully!"
+              echo "✅ Code quality checks passed"
+              echo "✅ Docker images built and deployed"
+            fi
+          else
+            echo "❌ Pipeline failed - check logs above"
+          fi
