@@ -5,6 +5,7 @@ Triggered when iris.csv.dvc is updated
 """
 import json
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -33,7 +34,7 @@ def train_model(data_path, experiment_name, model_name):
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run() as run:
-        print(f"Starting training run: {run.info.run_id}")
+        print(f"Starting training run: {run.info.run_id}", file=sys.stderr)
 
         # Log data source info
         data_info = {
@@ -46,9 +47,9 @@ def train_model(data_path, experiment_name, model_name):
         # Load and validate data
         try:
             df = pd.read_csv(data_path)
-            print(f"Loaded data: {len(df)} rows, {len(df.columns)} columns")
+            print(f"Loaded data: {len(df)} rows, {len(df.columns)} columns", file=sys.stderr)
         except Exception as e:
-            print(f"Error loading data: {e}")
+            print(f"Error loading data: {e}", file=sys.stderr)
             return None
 
         # Data validation
@@ -60,7 +61,7 @@ def train_model(data_path, experiment_name, model_name):
             "target",
         ]
         if not all(col in df.columns for col in required_columns):
-            print(f"Missing required columns. Expected: {required_columns}")
+            print(f"Missing required columns. Expected: {required_columns}", file=sys.stderr)
             return None
 
         # Prepare data
@@ -144,13 +145,13 @@ def train_model(data_path, experiment_name, model_name):
             with open("artifacts/latest_run_info.json", "w") as f:
                 json.dump(run_info, f, indent=2)
 
-            print(f"Model registered! Run ID: {run.info.run_id}")
-            print(f"Metrics: {metrics}")
+            # Only print run ID for capture by CI/CD
+            print(run.info.run_id)
             return run.info.run_id
         else:
-            print("Model does not meet staging criteria")
-            print(f"Current metrics: {metrics}")
-            print(f"Required thresholds: {staging_thresholds}")
+            print("Model does not meet staging criteria", file=sys.stderr)
+            print(f"Current metrics: {metrics}", file=sys.stderr)
+            print(f"Required thresholds: {staging_thresholds}", file=sys.stderr)
             return None
 
 
