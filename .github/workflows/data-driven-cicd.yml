@@ -74,12 +74,17 @@ jobs:
           GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
         run: |
-          # Configure DVC with secrets
-          uv run dvc remote modify gdrive gdrive_client_id $GDRIVE_CLIENT_ID
-          uv run dvc remote modify gdrive gdrive_client_secret $GDRIVE_CLIENT_SECRET
+          # Configure DVC with secrets (ensure they are strings)
+          uv run dvc remote modify gdrive gdrive_client_id "$GDRIVE_CLIENT_ID"
+          uv run dvc remote modify gdrive gdrive_client_secret "$GDRIVE_CLIENT_SECRET"
           
           # Pull updated data
-          uv run dvc pull data/raw/iris.csv.dvc
+          echo "Pulling data with DVC..."
+          uv run dvc pull data/raw/iris.csv.dvc || {
+            echo "DVC pull failed, trying to authenticate..."
+            uv run dvc remote modify gdrive gdrive_use_service_account false
+            uv run dvc pull data/raw/iris.csv.dvc
+          }
           echo "Data pulled successfully"
           
           # Validate data exists
