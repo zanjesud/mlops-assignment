@@ -146,25 +146,24 @@ jobs:
           
           # For pull requests, compare against base branch
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin ${{ github.base_ref }} || true
-            DIFF=$(git diff origin/${{ github.base_ref }} HEAD -- data/raw/iris.csv.dvc)
+            git fetch origin ${{ github.base_ref }} --depth=50 || true
+            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- data/raw/iris.csv.dvc 2>/dev/null || echo "")
             if [ -n "$DIFF" ]; then
               echo "✅ Detected changes in data/raw/iris.csv.dvc (PR)"
               DATA_CHANGED=true
             fi
-          # For pushes, compare against previous commit
+          # For pushes, use GitHub's changed files
           elif [ "${{ github.event_name }}" = "push" ]; then
-            # Check if DVC file was modified in this push
-            if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-              DIFF=$(git diff ${{ github.event.before }} HEAD -- data/raw/iris.csv.dvc)
-              if [ -n "$DIFF" ]; then
-                echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
-                DATA_CHANGED=true
-              fi
+            # Check if DVC file is in the list of changed files
+            CHANGED_FILES="${{ join(github.event.commits.*.modified, ' ') }} ${{ join(github.event.commits.*.added, ' ') }}"
+            if echo "$CHANGED_FILES" | grep -q "data/raw/iris.csv.dvc"; then
+              echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
+              DATA_CHANGED=true
             else
-              # First commit or force push - check if DVC file exists
-              if [ -f "data/raw/iris.csv.dvc" ]; then
-                echo "✅ DVC file exists in first commit"
+              # Fallback: check if file was modified in recent commits
+              git fetch origin --depth=10 || true
+              if git log --name-only --pretty=format: -10 | grep -q "data/raw/iris.csv.dvc"; then
+                echo "✅ DVC file modified in recent commits"
                 DATA_CHANGED=true
               fi
             fi
