@@ -11,7 +11,7 @@ import joblib
 import numpy as np
 import pytest
 from sklearn.datasets import load_iris
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
 
@@ -32,7 +32,7 @@ class TestModelPerformance:
     def trained_model(self, sample_data):
         """Create a trained model for testing"""
         X_train, X_test, y_train, y_test = sample_data
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model = LogisticRegression(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
         return model
 
@@ -96,7 +96,7 @@ class TestModelQuality:
         X, y = iris.data, iris.target
         X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model = LogisticRegression(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
         return model
 
@@ -267,7 +267,7 @@ class TestModelDrift:
                 X, y, test_size=0.2, random_state=random_state, stratify=y
             )
 
-            model = RandomForestClassifier(n_estimators=100, random_state=42)
+            model = LogisticRegression(n_estimators=100, random_state=42)
             model.fit(X_train, y_train)
 
             from sklearn.metrics import accuracy_score
@@ -297,7 +297,7 @@ def test_full_model_evaluation_pipeline():
     )
 
     # 2. Train model
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model = LogisticRegression(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
 
     # 3. Evaluate model
