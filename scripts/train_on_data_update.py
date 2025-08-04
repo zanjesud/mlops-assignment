@@ -74,15 +74,21 @@ def train_model(data_path, experiment_name, model_name):
         X = df.drop("target", axis=1)
         y = df["target"]
 
-        # Log dataset statistics
+        # Log dataset statistics with proper type conversion
+        class_dist = y.value_counts().to_dict()
+        class_dist_str = {str(k): int(v) for k, v in class_dist.items()}
+
         mlflow.log_params(
             {
-                "dataset_rows": len(df),
-                "dataset_features": len(X.columns),
-                "target_classes": len(y.unique()),
-                "class_distribution": dict(y.value_counts()),
+                "dataset_rows": int(len(df)),
+                "dataset_features": int(len(X.columns)),
+                "target_classes": int(len(y.unique())),
             }
         )
+
+        # Log class distribution as separate parameters
+        for class_label, count in class_dist_str.items():
+            mlflow.log_param(f"class_{class_label}_count", count)
 
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -105,17 +111,18 @@ def train_model(data_path, experiment_name, model_name):
         # Make predictions
         y_pred = model.predict(X_test)
 
-        # Calculate metrics
+        # Calculate metrics and ensure they are basic Python types
         metrics = {
-            "accuracy": accuracy_score(y_test, y_pred),
-            "precision": precision_score(y_test, y_pred, average="weighted"),
-            "recall": recall_score(y_test, y_pred, average="weighted"),
-            "f1_score": f1_score(y_test, y_pred, average="weighted"),
-            "training_time": training_time,
+            "accuracy": float(accuracy_score(y_test, y_pred)),
+            "precision": float(precision_score(y_test, y_pred, average="weighted")),
+            "recall": float(recall_score(y_test, y_pred, average="weighted")),
+            "f1_score": float(f1_score(y_test, y_pred, average="weighted")),
+            "training_time": float(training_time),
         }
 
-        # Log metrics
-        mlflow.log_metrics(metrics)
+        # Log metrics individually to avoid serialization issues
+        for metric_name, metric_value in metrics.items():
+            mlflow.log_metric(metric_name, metric_value)
 
         # Log model with signature
         signature = infer_signature(X_test, y_pred)
