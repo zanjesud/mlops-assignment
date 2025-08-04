@@ -94,10 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "Model Training & Validation"
     needs: quality-check
-    if: |
-      needs.quality-check.result == 'success' && 
-      (contains(github.event.head_commit.modified, 'data/raw/iris.csv.dvc') || 
-       github.event_name == 'workflow_dispatch')
+    if: needs.quality-check.result == 'success'
     
     outputs:
       model_trained: ${{ steps.training.outputs.model_trained }}
@@ -121,7 +118,25 @@ jobs:
       - name: Create directories
         run: mkdir -p logs artifacts data/processed models/production_model
       
+      - name: Check if data changed
+        id: data_check
+        run: |
+          echo "Checking for data changes..."
+          
+          # Check if iris.csv.dvc was modified in this push
+          if git diff --name-only HEAD~1 HEAD | grep -q "data/raw/iris.csv.dvc"; then
+            echo "data_changed=true" >> $GITHUB_OUTPUT
+            echo "✅ iris.csv.dvc was modified - will train model"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "data_changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual trigger - will train model"
+          else
+            echo "data_changed=false" >> $GITHUB_OUTPUT
+            echo "❌ No data changes detected - skipping model training"
+          fi
+      
       - name: Setup data
+        if: steps.data_check.outputs.data_changed == 'true'
         run: |
           if [ ! -f "data/raw/iris.csv" ]; then
             echo "Creating sample iris data..."
@@ -136,6 +151,7 @@ jobs:
       
       - name: Train and validate model
         id: training
+        if: steps.data_check.outputs.data_changed == 'true'
         run: |
           echo "Starting model training..."
           
@@ -173,7 +189,7 @@ jobs:
           fi
       
       - name: Upload model artifacts
-        if: steps.training.outputs.model_trained == 'true'
+        if: steps.data_check.outputs.data_changed == 'true' && steps.training.outputs.model_trained == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: model-artifacts
