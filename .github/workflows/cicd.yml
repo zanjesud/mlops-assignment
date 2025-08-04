@@ -242,28 +242,31 @@ jobs:
       - name: Build and push Docker images
         run: |
           export DOCKER_HUB_USERNAME=${{ env.DOCKER_HUB_USERNAME }}
-          export IMAGE_TAG=${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          export IMAGE_TAG=latest
           
-          # Build all services
+          # Build all services with latest tag first
           docker compose build
           
-          # Tag images
-          docker tag $DOCKER_HUB_USERNAME/mlops-api:latest $DOCKER_HUB_USERNAME/mlops-api:$IMAGE_TAG
-          docker tag $DOCKER_HUB_USERNAME/mlops-ui:latest $DOCKER_HUB_USERNAME/mlops-ui:$IMAGE_TAG
-          docker tag $DOCKER_HUB_USERNAME/mlops-mlflow:latest $DOCKER_HUB_USERNAME/mlops-mlflow:$IMAGE_TAG
+          # Create additional tags
+          FINAL_TAG=${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          
+          # Tag images with final tag
+          docker tag $DOCKER_HUB_USERNAME/mlops-api:latest $DOCKER_HUB_USERNAME/mlops-api:$FINAL_TAG
+          docker tag $DOCKER_HUB_USERNAME/mlops-ui:latest $DOCKER_HUB_USERNAME/mlops-ui:$FINAL_TAG
+          docker tag $DOCKER_HUB_USERNAME/mlops-mlflow:latest $DOCKER_HUB_USERNAME/mlops-mlflow:$FINAL_TAG
           
           # Push images
           docker push $DOCKER_HUB_USERNAME/mlops-api:latest
-          docker push $DOCKER_HUB_USERNAME/mlops-api:$IMAGE_TAG
+          docker push $DOCKER_HUB_USERNAME/mlops-api:$FINAL_TAG
           docker push $DOCKER_HUB_USERNAME/mlops-ui:latest
-          docker push $DOCKER_HUB_USERNAME/mlops-ui:$IMAGE_TAG
+          docker push $DOCKER_HUB_USERNAME/mlops-ui:$FINAL_TAG
           docker push $DOCKER_HUB_USERNAME/mlops-mlflow:latest
-          docker push $DOCKER_HUB_USERNAME/mlops-mlflow:$IMAGE_TAG
+          docker push $DOCKER_HUB_USERNAME/mlops-mlflow:$FINAL_TAG
       
       - name: Test Docker images
         run: |
           echo "Testing API image..."
-          docker run --rm -d --name test-api -p 8000:8000 ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:${{ steps.tags.outputs.tag }}${{ steps.tags.outputs.model_suffix }}
+          docker run --rm -d --name test-api -p 8000:8000 ${{ env.DOCKER_HUB_USERNAME }}/mlops-api:latest
           
           sleep 15
           
