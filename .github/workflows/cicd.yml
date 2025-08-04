@@ -144,16 +144,40 @@ jobs:
         run: |
           DATA_CHANGED=false
           
-          # Check if iris.csv.dvc was modified
-          if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
-            echo "✅ DVC file changed - triggering model training"
-            DATA_CHANGED=true
+          # For pull requests, compare against base branch
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }} || true
+            DIFF=$(git diff origin/${{ github.base_ref }} HEAD -- data/raw/iris.csv.dvc)
+            if [ -n "$DIFF" ]; then
+              echo "✅ Detected changes in data/raw/iris.csv.dvc (PR)"
+              DATA_CHANGED=true
+            fi
+          # For pushes, compare against previous commit
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            # Check if DVC file was modified in this push
+            if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              DIFF=$(git diff ${{ github.event.before }} HEAD -- data/raw/iris.csv.dvc)
+              if [ -n "$DIFF" ]; then
+                echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
+                DATA_CHANGED=true
+              fi
+            else
+              # First commit or force push - check if DVC file exists
+              if [ -f "data/raw/iris.csv.dvc" ]; then
+                echo "✅ DVC file exists in first commit"
+                DATA_CHANGED=true
+              fi
+            fi
           fi
           
           # Manual workflow trigger
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.trigger_training }}" = "true" ]; then
             echo "✅ Manual training trigger"
             DATA_CHANGED=true
+          fi
+          
+          if [ "$DATA_CHANGED" = "false" ]; then
+            echo "❌ No data changes detected - skipping model training"
           fi
           
           echo "data_changed=$DATA_CHANGED" >> $GITHUB_OUTPUT
