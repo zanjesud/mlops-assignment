@@ -29,7 +29,6 @@ jobs:
   data-validation-and-training:
     runs-on: ubuntu-latest
     name: "Data Validation & Model Training"
-    if: contains(github.event.head_commit.modified, 'data/raw/iris.csv.dvc') || github.event_name == 'workflow_dispatch'
     
     outputs:
       model_trained: ${{ steps.training.outputs.model_trained }}
@@ -37,6 +36,20 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Debug - Check what triggered this workflow
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Files changed in this push:"
+          git show --name-only --pretty=format: HEAD | grep -v '^$' || echo "No files found"
+          
+          echo "Checking if iris.csv.dvc exists and was modified:"
+          if [ -f "data/raw/iris.csv.dvc" ]; then
+            echo "✅ iris.csv.dvc file exists"
+          else
+            echo "❌ iris.csv.dvc file not found"
+          fi
       
       - name: Setup Python
         uses: actions/setup-python@v4
