@@ -300,4 +300,3 @@ jobs:
           else
             echo "❌ Pipeline failed"
           fi
-          fi
