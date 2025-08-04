@@ -24,3 +24,10 @@ feature_importance.csv
 logs/
 SteptoImplements.txt
 data/processed/test_data.pkl
+
+# Model artifacts
+artifacts/
+
+test.py
+extracted_iris_data.csv
+iris_extended.csv

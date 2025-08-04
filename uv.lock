@@ -1826,11 +1826,12 @@ wheels = [
 [[package]]
 name = "mlops-assignment"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "black" },
     { name = "dvc" },
     { name = "dvc-gdrive" },
+    { name = "fastapi" },
     { name = "flake8" },
     { name = "httpx" },
     { name = "isort" },
@@ -1847,6 +1848,7 @@ dependencies = [
     { name = "streamlit" },
     { name = "types-requests" },
     { name = "types-setuptools" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -1854,6 +1856,7 @@ requires-dist = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "dvc", specifier = ">=3.61.0" },
     { name = "dvc-gdrive", specifier = ">=3.0.1" },
+    { name = "fastapi", specifier = ">=0.115.6" },
     { name = "flake8", specifier = ">=7.3.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "isort", specifier = ">=6.0.1" },
@@ -1870,6 +1873,7 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.47.1" },
     { name = "types-requests", specifier = ">=2.32.4.20250611" },
     { name = "types-setuptools", specifier = ">=80.9.0.20250801" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
 [[package]]
