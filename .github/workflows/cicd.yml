@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      trigger_training:
+        description: 'Force model training'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -123,12 +128,26 @@ jobs:
         run: |
           DATA_CHANGED=false
           
-          # Check if iris.csv.dvc was modified in this commit
+          # Method 1: Check if iris.csv.dvc was modified in this commit
           if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
             echo "✅ iris.csv.dvc was modified in this commit"
             DATA_CHANGED=true
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "✅ Manual workflow trigger"
+          fi
+          
+          # Method 2: Check if DVC file exists (fallback)
+          if [ -f "data/raw/iris.csv.dvc" ] && [ "$DATA_CHANGED" = "false" ]; then
+            echo "✅ iris.csv.dvc file exists - checking if this is data-driven trigger"
+            # Check if this push only contains DVC file changes
+            CHANGED_FILES=$(git show --name-only --pretty=format: HEAD | grep -v '^$' | wc -l)
+            if [ "$CHANGED_FILES" -eq 1 ] && git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
+              echo "✅ Only DVC file changed - treating as data update"
+              DATA_CHANGED=true
+            fi
+          fi
+          
+          # Method 3: Manual workflow trigger
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.trigger_training }}" = "true" ]; then
+            echo "✅ Manual training trigger"
             DATA_CHANGED=true
           fi
           
