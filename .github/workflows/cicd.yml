@@ -152,8 +152,24 @@ jobs:
           # For pushes and PRs, check if DVC file exists (workflow triggered by paths filter)
           elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ -f "data/raw/iris.csv.dvc" ]; then
-              echo "✅ Workflow triggered and DVC file exists in list - training model"
-              DATA_CHANGED=true
+              # Check if the DVC file was actually changed in this commit/PR
+              if [ "${{ github.event_name }}" = "push" ]; then
+                # For push events, check if DVC file changed between previous commit and current
+                if git diff --name-only HEAD~1 HEAD | grep -q "data/raw/iris.csv.dvc"; then
+                  echo "✅ Push event: DVC file exists and was modified - training model"
+                  DATA_CHANGED=true
+                else
+                  echo "❌ Push event: DVC file exists but was not modified in this commit"
+                fi
+              elif [ "${{ github.event_name }}" = "pull_request" ]; then
+                # For PR events, check if DVC file changed between base and head
+                if git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep -q "data/raw/iris.csv.dvc"; then
+                  echo "✅ PR event: DVC file exists and was modified - training model"
+                  DATA_CHANGED=true
+                else
+                  echo "❌ PR event: DVC file exists but was not modified in this PR"
+                fi
+              fi
             else
               echo "❌ DVC file not found"
             fi
