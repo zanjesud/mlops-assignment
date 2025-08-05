@@ -156,15 +156,12 @@ jobs:
           elif [ "${{ github.event_name }}" = "push" ]; then
             # Check if DVC file is in the list of changed files
             CHANGED_FILES="${{ join(github.event.commits.*.modified, ' ') }} ${{ join(github.event.commits.*.added, ' ') }}"
+            echo "Debug: Changed files in this push: $CHANGED_FILES"
             if echo "$CHANGED_FILES" | grep -q "data/raw/iris.csv.dvc"; then
               echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
               DATA_CHANGED=true
             else
-              # Fallback: check if file was modified in the current commit only
-              if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
-                echo "✅ DVC file modified in current commit"
-                DATA_CHANGED=true
-              fi
+              echo "❌ No DVC file changes detected in push event"
             fi
           fi
           
