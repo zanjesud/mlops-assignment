@@ -138,22 +138,41 @@ jobs:
       
       - name: Create directories
         run: mkdir -p logs artifacts data/processed models/production_model
+
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            data/raw/iris.csv.dvc
       
       - name: Check if data changed
         id: data_check
         run: |
           DATA_CHANGED=false
           
-          # Check if iris.csv.dvc was modified
-          if git show --name-only --pretty=format: HEAD | grep -q "data/raw/iris.csv.dvc"; then
-            echo "✅ DVC file changed - triggering model training"
-            DATA_CHANGED=true
-          fi
-          
           # Manual workflow trigger
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.trigger_training }}" = "true" ]; then
             echo "✅ Manual training trigger"
             DATA_CHANGED=true
+          
+          # For pushes and PRs, check if DVC file exists (workflow triggered by paths filter)
+          elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ -f "data/raw/iris.csv.dvc" ]; then
+              if [ "${{ steps.changed-files.outputs.any_changed }}" = "true" ]; then
+                echo "✅ Workflow triggered and DVC file exists and was modified - training model"
+                DATA_CHANGED=true
+              else
+                echo "❌ DVC file exists but was not modified"
+              fi
+            else
+              echo "❌ DVC file not found"
+            fi
+          fi
+          
+          if [ "$DATA_CHANGED" = "false" ]; then
+            echo "❌ As No data changes detected - skipping model training"
           fi
           
           echo "data_changed=$DATA_CHANGED" >> $GITHUB_OUTPUT

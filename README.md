@@ -9,16 +9,27 @@ A comprehensive MLOps pipeline demonstrating **Data Version Control (DVC)**, **M
 
 ## 🎯 Project Overview
 
-This project showcases a complete MLOps workflow from data ingestion to production deployment, including:
+This project showcases a complete MLOps workflow from data ingestion to production deployment, featuring:
 
-- 📊 **Data Version Control** with DVC and Google Drive
-- 🤖 **Machine Learning** with scikit-learn and MLflow
+- 📊 **Data Version Control** with DVC and Google Drive remote storage
+- 🤖 **Machine Learning** with scikit-learn and MLflow model registry
 - 🚀 **REST API** with FastAPI and Prometheus metrics
-- 🎨 **Web UI** with Streamlit
+- 🎨 **Web UI** with Streamlit for model interaction
 - 🐳 **Containerization** with Docker and Docker Compose
-- 📈 **Monitoring** with Prometheus and Grafana
-- 🔄 **CI/CD** with GitHub Actions
-- 🧪 **Testing** with pytest and coverage reporting
+- 📈 **Monitoring** with Prometheus and Grafana dashboards
+- 🔄 **Smart CI/CD** with data-driven GitHub Actions
+- 🧪 **Comprehensive Testing** with pytest and model validation
+- 🔍 **Model Validation** with data quality, performance, and robustness checks
+- 🏆 **Automated Promotion** with staging and production pipelines
+
+### 🎆 Key MLOps Enhancements
+
+✨ **Data-Driven Training**: Models retrain automatically only when `iris.csv.dvc` changes
+✨ **Comprehensive Validation**: 3-tier validation (data quality, performance, robustness)
+✨ **Smart Promotion**: Automated staging (≥85%) and production (≥95%) promotion
+✨ **MLflow Aliases**: Uses modern model aliases instead of deprecated stages
+✨ **Robust CI/CD**: Handles GitHub Actions shallow clones and edge cases
+✨ **Quality Gates**: Prevents poor models from reaching production
 
 ## 🏗️ Architecture
 
@@ -522,51 +533,117 @@ uv run mypy .
 uv run pytest --cov=api --cov-report=html
 ```
 
-### 7. 🔄 CI/CD Pipeline
+### 7. 🔄 Enhanced CI/CD Pipeline
 
-#### GitHub Actions Workflow
+#### Data-Driven MLOps Pipeline
+Our CI/CD pipeline features intelligent data change detection and comprehensive model validation:
+
 ```yaml
-# .github/workflows/ci-cd.yml
-name: CI & CD Pipeline
+# .github/workflows/cicd.yml
+name: MLOps CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
+    paths:
+      - 'data/raw/iris.csv.dvc'  # Triggers on data changes
+      - 'api/**'
+      - 'models/**'
+      - 'scripts/**'
   pull_request:
-    branches: [main]
+    branches: [master]
+  workflow_dispatch:  # Manual triggers
+    inputs:
+      trigger_training:
+        description: 'Force model training'
+        type: boolean
 
 jobs:
-  ci:
+  # Stage 1: Code Quality & Testing
+  quality-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
+      - name: Setup Python & Dependencies
         run: |
           pip install uv
-          uv pip install pytest pytest-cov ruff black isort mypy
-      - name: Run tests
-        run: uv run pytest
-      - name: Run linting
+          uv pip install -e .
+      - name: Code Quality Checks
         run: |
-          uv run ruff check .
+          uv run ruff check . --select E,F,W
           uv run black --check .
           uv run isort --check-only .
           uv run mypy .
+      - name: Run Tests
+        run: |
+          uv run pytest tests/test_api.py -v --cov=api
+          uv run pytest tests/test_model_evaluation.py -v --cov=models
 
-  build-and-push:
-    needs: ci
+  # Stage 2: Data-Driven Model Training
+  model-training:
+    needs: quality-check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Build and push Docker images
+      - name: Smart Data Change Detection
         run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.sha }} .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-api:${{ github.sha }}
+          # For pushes: Check GitHub event data
+          CHANGED_FILES="${{ join(github.event.commits.*.modified, ' ') }}"
+          if echo "$CHANGED_FILES" | grep -q "data/raw/iris.csv.dvc"; then
+            echo "✅ Data changes detected"
+            echo "data_changed=true" >> $GITHUB_OUTPUT
+          fi
+          
+          # For PRs: Compare against base branch
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }} --depth=50
+            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- data/raw/iris.csv.dvc)
+            [ -n "$DIFF" ] && echo "data_changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Comprehensive Model Training & Validation
+        if: steps.data_check.outputs.data_changed == 'true'
+        run: |
+          # Train with enhanced validation
+          RUN_ID=$(uv run python scripts/train_on_data_update.py)
+          
+          # Automatic promotion pipeline
+          uv run python scripts/promote_to_staging.py --run_id $RUN_ID
+          
+          # Production promotion on master branch
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            uv run python scripts/promote_to_production.py
+          fi
+
+  # Stage 3: Build & Deploy
+  build-and-deploy:
+    needs: [quality-check, model-training]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build & Push Docker Images
+        run: |
+          docker build --target api -t ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-api:latest .
+          docker build --target ui -t ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-ui:latest .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-api:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mlops-ui:latest
 ```
+
+#### Key Pipeline Features
+
+🎯 **Smart Triggering**:
+- Only trains models when `iris.csv.dvc` changes
+- Supports manual triggers via workflow_dispatch
+- Handles both push and pull request events
+
+🔍 **Comprehensive Validation**:
+- **Data Quality**: Sample size, class balance, missing values
+- **Model Performance**: Accuracy, precision, recall, F1-score per class
+- **Robustness**: Cross-validation stability (CV std < 5%)
+- **Thresholds**: 85% accuracy, 80% min class F1-score
+
+🚀 **Automated Promotion**:
+- Staging: Models meeting 85% thresholds
+- Production: Models meeting 95% thresholds (master branch only)
+- Uses MLflow model aliases instead of deprecated stages
 
 ### 8. 🚀 Production Deployment
 
@@ -630,20 +707,30 @@ mlflow experiments list
 mlflow ui
 ```
 
-### Model Management
+### Enhanced Model Management
 ```bash
-# List registered models
-python models/promote_model.py list-models
+# Data-driven training with comprehensive validation
+python scripts/train_on_data_update.py
 
-# Promote to staging
-python models/promote_model.py promote-to-staging --run-id 'run-id'
+# Promote to staging (with model aliases)
+python scripts/promote_to_staging.py --run_id 'run-id'
 
-# Promote to production
-python models/promote_model.py promote-to-production
+# Promote to production (stricter thresholds)
+python scripts/promote_to_production.py
 
-# Compare models
-python models/promote_model.py compare --version1 1 --version2 2
+# Check model validation results
+cat artifacts/latest_run_info.json
+
+# View promotion history
+cat logs/promotion_history.json
 ```
+
+#### Model Validation Metrics
+- **Data Quality**: ≥100 samples, ≥10% per class, no missing values
+- **Performance**: ≥85% accuracy, precision, recall, F1-score
+- **Per-Class**: ≥80% F1-score for all classes
+- **Stability**: ≤5% cross-validation standard deviation
+- **Production**: ≥95% thresholds for production promotion
 
 ### Data Management
 ```bash
@@ -699,6 +786,9 @@ uv run pre-commit run --all-files
 | **Model loading** | Verify model is registered in MLflow registry |
 | **DVC remote** | Check Google Drive credentials and permissions |
 | **Docker build fails** | Clear Docker cache: `docker system prune -a` |
+| **Data change detection** | Workflow only triggers on `iris.csv.dvc` changes |
+| **Model validation fails** | Check validation thresholds and data quality |
+| **MLflow serialization** | Uses model aliases instead of deprecated stages |
 
 ### Setup Warnings
 
@@ -724,12 +814,22 @@ curl http://localhost:8501/_stcore/health
 # Check Prometheus targets
 curl http://localhost:9090/api/v1/targets
 
-# Check MLflow experiments
+# Check MLflow experiments and models
 mlflow experiments list
+mlflow models list
 
-# Check DVC status
+# Check DVC status and data
 dvc status
 dvc remote list
+dvc pull data/raw/iris.csv.dvc
+
+# Debug model validation
+cat artifacts/latest_run_info.json | jq '.validation_results'
+cat logs/promotion_history.json | tail -5
+
+# Test data change detection locally
+git log --name-only --pretty=format: -5 | grep "data/raw/iris.csv.dvc"
+git diff HEAD~1 HEAD -- data/raw/iris.csv.dvc
 ```
 
 ## 📚 Additional Resources

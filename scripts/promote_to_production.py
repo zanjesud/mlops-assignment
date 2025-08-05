@@ -14,6 +14,51 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 
+def display_production_matrix(run_id, model_name, client):
+    """Display production performance matrix before promotion"""
+    print("\n=== PRODUCTION PROMOTION MATRIX ===")
+    print("Evaluating model for production deployment:")
+
+    try:
+        # Get run metrics
+        run = client.get_run(run_id)
+        metrics = run.data.metrics
+
+        # Display production thresholds
+        print("\nProduction Requirements (95% thresholds):")
+        print("  - Accuracy: >=95%")
+        print("  - Precision: >=95%")
+        print("  - Recall: >=95%")
+        print("  - F1-Score: >=95%")
+
+        # Check current model performance against production thresholds
+        production_thresholds = {
+            "accuracy": 0.95,
+            "precision": 0.95,
+            "recall": 0.95,
+            "f1_score": 0.95,
+        }
+
+        print("\nCurrent Model Performance:")
+        print("\nProduction Readiness Check:")
+        all_pass = True
+        for metric, threshold in production_thresholds.items():
+            value = metrics.get(metric, 0)
+            status = "PASS" if value >= threshold else "FAIL"
+            print(f"  {metric}: {value:.4f} (req: {threshold:.2f}) [{status}]")
+            if value < threshold:
+                all_pass = False
+
+        print(f"\nOverall Production Readiness: {'READY' if all_pass else 'NOT READY'}")
+        print("\n" + "=" * 50)
+
+        return all_pass
+
+    except Exception as e:
+        print(f"Error displaying production matrix: {e}")
+        return False
+
+
 @click.command()
 @click.option("--model_name", default="iris_classifier", help="Model name")
 @click.option("--force", is_flag=True, help="Force promotion without validation")
@@ -34,30 +79,18 @@ def promote_to_production(model_name, force):
 
         model_version = staging_info["version"]
 
+        # Get run ID for matrix display
+        run_id = staging_info["run_id"]
+
+        # Display production performance matrix
+        production_ready = display_production_matrix(run_id, model_name, client)
+
         # Additional production validation (stricter thresholds)
-        if not force:
-            production_thresholds = {
-                "accuracy": 0.95,
-                "precision": 0.95,
-                "recall": 0.95,
-                "f1_score": 0.95,
-            }
-
-            # Get run metrics
-            run_id = staging_info["run_id"]
-            run = client.get_run(run_id)
-            metrics = run.data.metrics
-
-            meets_production_criteria = all(
-                metrics.get(metric, 0) >= threshold
-                for metric, threshold in production_thresholds.items()
-            )
-
-            if not meets_production_criteria:
-                print("Model does not meet production criteria")
-                print(f"Current metrics: {dict(metrics)}")
-                print(f"Required thresholds: {production_thresholds}")
-                return False
+        if not force and not production_ready:
+            print("Model does not meet production criteria")
+            return False
+        elif force:
+            print("Force promotion enabled - skipping validation checks")
 
         # Use model aliases instead of deprecated stages
         try:
