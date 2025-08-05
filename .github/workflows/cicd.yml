@@ -152,7 +152,7 @@ jobs:
           # For pushes and PRs, check if DVC file exists (workflow triggered by paths filter)
           elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ -f "data/raw/iris.csv.dvc" ]; then
-              echo "✅ Workflow triggered and DVC file exists - training model"
+              echo "✅ Workflow triggered and DVC file exists in list - training model"
               DATA_CHANGED=true
             else
               echo "❌ DVC file not found"
