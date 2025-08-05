@@ -1,9 +1,8 @@
 [core]
-    remote = gdrive
     autostage = true
+    remote = gdrive
 ['remote "gdrive"']
     url = gdrive://14v9yGR-7czWk9DnTUPvd2Gp1xSPoeHug
-    gdrive_use_service_account = false
-    gdrive_service_account_json_file_path = E:\Git\mlops-assignment\dvc_google.json
-    gdrive_client_id = 672029989825-dh480i4fh2qg0pg4jso8gp1ajdjn93ci.apps.googleusercontent.com
-    gdrive_client_secret = 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
+    gdrive_acknowledge_abuse = true
+    gdrive_client_id = 672029989825-gqe7dltjmab8u3m8gg41epr7jq5pqpm5.apps.googleusercontent.com
+    gdrive_client_secret = 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
