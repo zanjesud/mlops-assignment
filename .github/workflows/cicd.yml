@@ -144,45 +144,19 @@ jobs:
         run: |
           DATA_CHANGED=false
           
-          # For pull requests, compare against base branch
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin ${{ github.base_ref }} --depth=50 || true
-            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD --name-only | grep "data/raw/iris.csv.dvc" || echo "")
-            if [ -n "$DIFF" ]; then
-              echo "✅ Detected changes in data/raw/iris.csv.dvc (PR)"
-              DATA_CHANGED=true
-            fi
-          # For pushes, check multiple sources
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            # Method 1: GitHub event data
-            MODIFIED_FILES="${{ join(github.event.commits.*.modified, ' ') }}"
-            ADDED_FILES="${{ join(github.event.commits.*.added, ' ') }}"
-            ALL_CHANGED="$MODIFIED_FILES $ADDED_FILES"
-            
-            echo "Debug: Modified files: $MODIFIED_FILES"
-            echo "Debug: Added files: $ADDED_FILES"
-            echo "Debug: All changed files: $ALL_CHANGED"
-            
-            # Check for DVC file in multiple formats
-            if echo "$ALL_CHANGED" | grep -E "(^|\s)(data/raw/iris\.csv\.dvc|iris\.csv\.dvc)(\s|$)" > /dev/null; then
-              echo "✅ Detected DVC file changes via GitHub event"
-              DATA_CHANGED=true
-            else
-              # Method 2: Git diff as fallback
-              echo "Checking with git diff as fallback..."
-              if git diff --name-only HEAD~1 HEAD | grep "data/raw/iris.csv.dvc" > /dev/null 2>&1; then
-                echo "✅ Detected DVC file changes via git diff"
-                DATA_CHANGED=true
-              else
-                echo "❌ No DVC file changes detected"
-              fi
-            fi
-          fi
-          
           # Manual workflow trigger
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.trigger_training }}" = "true" ]; then
             echo "✅ Manual training trigger"
             DATA_CHANGED=true
+          
+          # For pushes and PRs, check if DVC file exists (workflow triggered by paths filter)
+          elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ -f "data/raw/iris.csv.dvc" ]; then
+              echo "✅ Workflow triggered and DVC file exists - training model"
+              DATA_CHANGED=true
+            else
+              echo "❌ DVC file not found"
+            fi
           fi
           
           if [ "$DATA_CHANGED" = "false" ]; then
