@@ -147,21 +147,35 @@ jobs:
           # For pull requests, compare against base branch
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch origin ${{ github.base_ref }} --depth=50 || true
-            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- data/raw/iris.csv.dvc 2>/dev/null || echo "")
+            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD --name-only | grep "data/raw/iris.csv.dvc" || echo "")
             if [ -n "$DIFF" ]; then
               echo "✅ Detected changes in data/raw/iris.csv.dvc (PR)"
               DATA_CHANGED=true
             fi
-          # For pushes, use GitHub's changed files
+          # For pushes, check multiple sources
           elif [ "${{ github.event_name }}" = "push" ]; then
-            # Check if DVC file is in the list of changed files
-            CHANGED_FILES="${{ join(github.event.commits.*.modified, ' ') }} ${{ join(github.event.commits.*.added, ' ') }}"
-            echo "Debug: Changed files in this push: $CHANGED_FILES"
-            if echo "$CHANGED_FILES" | grep -q "data/raw/iris.csv.dvc"; then
-              echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
+            # Method 1: GitHub event data
+            MODIFIED_FILES="${{ join(github.event.commits.*.modified, ' ') }}"
+            ADDED_FILES="${{ join(github.event.commits.*.added, ' ') }}"
+            ALL_CHANGED="$MODIFIED_FILES $ADDED_FILES"
+            
+            echo "Debug: Modified files: $MODIFIED_FILES"
+            echo "Debug: Added files: $ADDED_FILES"
+            echo "Debug: All changed files: $ALL_CHANGED"
+            
+            # Check for DVC file in multiple formats
+            if echo "$ALL_CHANGED" | grep -E "(^|\s)(data/raw/iris\.csv\.dvc|iris\.csv\.dvc)(\s|$)" > /dev/null; then
+              echo "✅ Detected DVC file changes via GitHub event"
               DATA_CHANGED=true
             else
-              echo "❌ No DVC file changes detected in push event"
+              # Method 2: Git diff as fallback
+              echo "Checking with git diff as fallback..."
+              if git diff --name-only HEAD~1 HEAD | grep "data/raw/iris.csv.dvc" > /dev/null 2>&1; then
+                echo "✅ Detected DVC file changes via git diff"
+                DATA_CHANGED=true
+              else
+                echo "❌ No DVC file changes detected"
+              fi
             fi
           fi
           
