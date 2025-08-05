@@ -160,10 +160,9 @@ jobs:
               echo "✅ Detected changes in data/raw/iris.csv.dvc (Push)"
               DATA_CHANGED=true
             else
-              # Fallback: check if file was modified in recent commits
-              git fetch origin --depth=10 || true
-              if git log --name-only --pretty=format: -10 | grep -q "data/raw/iris.csv.dvc"; then
-                echo "✅ DVC file modified in recent commits"
+              # Fallback: check if file was modified in recent commits on current branch only
+              if git log --name-only --pretty=format: -5 HEAD | grep -q "data/raw/iris.csv.dvc"; then
+                echo "✅ DVC file modified in recent commits on current branch"
                 DATA_CHANGED=true
               fi
             fi
