@@ -172,7 +172,7 @@ jobs:
           fi
           
           if [ "$DATA_CHANGED" = "false" ]; then
-            echo "❌ No data changes detected - skipping model training"
+            echo "❌ As No data changes detected - skipping model training"
           fi
           
           echo "data_changed=$DATA_CHANGED" >> $GITHUB_OUTPUT
