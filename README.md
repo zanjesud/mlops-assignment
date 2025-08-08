@@ -1,7 +1,11 @@
 # 🌸 MLOps Assignment - Complete ML Pipeline with Docker
 
 [![CI/CD Pipeline](https://github.com/zanjesud/mlops-assignment/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/zanjesud/mlops-assignment/actions/workflows/ci-cd.yml)
-[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-mlops--assignment-blue)](https://hub.docker.com/r/zanjesud/mlops-assignment)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/zanjesud/mlops-assignment)
+[![Docker Hub - API](https://img.shields.io/badge/Docker%20Hub-API-blue?logo=docker)](https://hub.docker.com/r/zanjesud/mlops-api)
+[![Docker Hub - UI](https://img.shields.io/badge/Docker%20Hub-UI-blue?logo=docker)](https://hub.docker.com/r/zanjesud/mlops-ui)
+[![Docker Hub - MLflow](https://img.shields.io/badge/Docker%20Hub-MLflow-blue?logo=docker)](https://hub.docker.com/r/zanjesud/mlops-mlflow)
+[![Video Demo](https://img.shields.io/badge/Video-Demo-red?logo=youtube)](https://drive.google.com/file/d/12iM5nzxAwmO2mIuTFTVRnUf8D8NhegM3/view?usp=drive_link)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
